@@ -3,7 +3,7 @@
   "$id": "https://paintz.local/schemas/paints.schema.json",
   "title": "PaintZ PackKit v1 paint manifest",
   "type": "object",
-  "required": ["schema_version", "pack", "generator", "paints"],
+  "required": ["schema_version", "pack", "paints"],
   "properties": {
     "schema_version": {"const": 1},
     "pack": {
