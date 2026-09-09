@@ -38,7 +38,9 @@ PaintZ runtime -X-> specific paint packs
 
 PaintZ owns runtime behaviour and the common spray-can implementation. PackKit owns offline generation and validation. Paint packs own finish content.
 
-A normal generated API-v1 paint pack may contain:
+A generated API-v1 namespace family has exactly one owner PBO and may have zero or more satellite/content PBOs.
+
+An owner pack may contain:
 
 - exactly one namespace-owner declaration;
 - finish registrations;
@@ -48,7 +50,9 @@ A normal generated API-v1 paint pack may contain:
 - `CfgPatches` dependency metadata;
 - optional `types.xml` entries and restrained branding.
 
-A normal paint pack must not define painting actions, persistence, synchronization, target policy, or other PaintZ gameplay mechanics.
+A satellite pack may contain the same finish/content material, but it references the existing owner and must not emit another namespace-owner declaration. It must depend on both PaintZ and the owner/core PBO.
+
+A generated paint pack must not define painting actions, persistence, synchronization, target policy, or other PaintZ gameplay mechanics.
 
 ## Paint Pack API v1 identity
 
@@ -71,7 +75,7 @@ Do **not** introduce a second reverse-domain canonical ID, UUID, secret, generat
 
 ### Prefix
 
-A normal third-party pack has one permanent prefix matching:
+A normal third-party namespace family has one permanent prefix matching:
 
 ```text
 ^[A-Z][A-Z0-9]{1,2}$
@@ -79,7 +83,7 @@ A normal third-party pack has one permanent prefix matching:
 
 All valid prefixes beginning with `PZ` are reserved for official PaintZ content. Normal PackKit validation must reject them.
 
-The PaintZ Standard Pack/official content may use `PZ*` only through the explicit `--official` generation path. That path emits `official = 1` in the namespace declaration. It is an interoperability gate, not cryptographic authentication.
+Official PaintZ owner or satellite content may use `PZ*` only through the explicit `--official` generation path. An official owner declaration emits `official = 1`; a satellite emits no owner declaration. This is an interoperability gate, not cryptographic authentication.
 
 Changing a released prefix is a breaking persistence/identity change.
 
@@ -92,6 +96,8 @@ S C P M R W F X T
 ```
 
 Finish suffixes are uppercase alphanumeric, 2-12 characters, with descriptive 3-character suffixes preferred. Changing a released complete finish ID is a breaking persistence change.
+
+Moving a finish between PBOs inside the same namespace family is not an identity change when the complete finish ID is retained.
 
 IDs and generated classnames must be deterministic from authoritative input. Never derive identity from timestamps, random values or unordered traversal.
 
@@ -108,13 +114,34 @@ PaintZ performs runtime collision detection against the complete loaded set:
 
 Do not imply PackKit can globally reserve or prove ownership of a prefix.
 
-For future multi-PBO pack families, only one owner/core PBO declares the namespace. Satellite PBOs depend on it and do not re-declare ownership.
+For multi-PBO pack families, only one owner/core PBO declares the namespace. Satellite PBOs depend on it and do not re-declare ownership.
+
+## Owner and satellite manifest roles
+
+`dayz.namespace_role` is source-controlled pack architecture, not a transient CLI choice.
+
+- omitted or `owner`: generate a normal namespace-owner pack;
+- `satellite`: generate a content PBO that contributes finishes to an existing namespace owner.
+
+Satellite manifests must provide:
+
+- `dayz.owner_class`: exact existing `CfgPaintZPacks` child classname;
+- `dayz.owner_patch`: exact owner/core `CfgPatches` classname.
+
+Satellite output must:
+
+- omit `CfgPaintZPacks` entirely;
+- set every finish registration's `owner` to `dayz.owner_class`;
+- include both `PaintZ_DynamicPaint` and `dayz.owner_patch` in `requiredAddons[]`;
+- use deterministic local config child names so independently generated satellites do not unnecessarily reuse the owner PBO's registration classnames.
+
+Do not add a second namespace declaration to make a satellite "self contained". That would deliberately trigger a namespace collision.
 
 ## Generated DayZ config rules
 
 Inspect the current PaintZ runtime config contract before changing runtime-facing output.
 
-API-v1 output must generate:
+API-v1 owner output must generate:
 
 - `CfgPatches.requiredAddons[]` including `PaintZ_DynamicPaint`;
 - one `CfgPaintZPacks` owner declaration;
@@ -125,6 +152,12 @@ API-v1 output must generate:
 - only actually generated scale variants for patterns;
 - one thin spawnable can subclass per finish using `paintzFinish`.
 
+API-v1 satellite output must generate the same finish/can/surface content except:
+
+- no `CfgPaintZPacks` owner declaration;
+- finish `owner` linkage targets the supplied existing owner class;
+- `requiredAddons[]` also contains the supplied owner/core patch class.
+
 Normal API-v1 output must **not** generate:
 
 - per-finish `ActionPaintZPaint_*` Enforce classes;
@@ -132,7 +165,7 @@ Normal API-v1 output must **not** generate:
 - per-finish action registration/attachment logic;
 - painted subclasses for weapons, magazines, attachments or other targets.
 
-The generated owner config classname is a deterministic config linkage key, not another PaintZ identity or security token. Generate distinctive owner/finish config class names because DayZ merges config trees before PaintZ enumerates them.
+The owner config classname is a deterministic config linkage key, not another PaintZ identity or security token. Generate distinctive owner/finish config class names because DayZ merges config trees before PaintZ enumerates them.
 
 ## Spray-can design and branding
 
@@ -160,6 +193,7 @@ Validate as applicable:
 
 - manifest/schema version;
 - pack prefix syntax and reserved-prefix rules;
+- namespace role and required satellite owner linkage;
 - finish suffix/type syntax;
 - complete finish-ID uniqueness;
 - generated classname uniqueness;
@@ -185,10 +219,13 @@ Add automated tests for generator behavior where practical. High-value coverage 
 
 - namespaced IDs and normalization;
 - reserved `PZ*` rejection in normal mode;
-- explicit official `PZ` generation;
+- explicit official `PZ` owner generation;
+- official `PZ` satellite generation without a second owner declaration;
+- required satellite owner-class/owner-patch linkage;
 - duplicate finish IDs;
 - deterministic owner/classname generation;
-- standalone `config.cpp` structure;
+- standalone owner `config.cpp` structure;
+- satellite `config.cpp` structure and owner dependency;
 - absence of legacy generated Enforce actions/catalogue;
 - representative solid and patterned finishes;
 - explicit scale declarations;
@@ -209,10 +246,11 @@ Do not invent a GUI, online prefix registry, cryptographic ownership system, bro
 
 Prefer the smallest design that supports:
 
-1. one permanent pack namespace;
-2. authoritative finish definitions;
-3. standardized asset generation;
-4. thin can-class generation;
-5. explicit finish registration;
-6. validation;
-7. deterministic output.
+1. one permanent namespace per pack family;
+2. exactly one namespace owner with optional satellite content PBOs;
+3. authoritative finish definitions;
+4. standardized asset generation;
+5. thin can-class generation;
+6. explicit finish registration;
+7. validation;
+8. deterministic output.
