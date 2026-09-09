@@ -162,6 +162,10 @@ def render_surface(
         pattern_path = (repo_root / paint["pattern"]).resolve()
         surface = pattern_fill(pattern_path, size)
 
+    if paint.get("type") == "basic":
+        surface.info["appearance_profile"] = "none"
+        return tag_srgb(surface)
+
     profile_name, profile = _resolve_profile(paint, appearance_cfg)
     _apply_finish_stack(surface, code, repo_root, profile)
     tag_srgb(surface)
