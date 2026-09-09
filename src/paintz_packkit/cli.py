@@ -7,12 +7,12 @@ from pathlib import Path
 
 from PIL import Image
 
+from . import __version__
 from .dayz import emit_dayz
 from .ids import code_for_paint, code_to_slug, type_code
 from .manifest import load_manifest
 from .render import create_base, find_font, render_label, save_preview, save_preview_catalog
 from .scaled_surface import render_surface_scaled
-from . import __version__
 
 
 def save_png(image: Image.Image, path: Path):
@@ -84,13 +84,14 @@ def _build_catalog(data: dict) -> tuple[list[dict], int]:
     codes: dict[str, dict] = {}
     suggested_count = 0
     pattern_scales = load_pattern_scales(data)
+    prefix = data["pack"]["prefix"]
 
     for paint in data["paints"]:
-        code, suggested = code_for_paint(paint)
+        code, suggested = code_for_paint(paint, prefix)
         if code in codes:
             other = codes[code]
             raise ValueError(
-                "Duplicate PaintZ product code: "
+                "Duplicate PaintZ finish ID: "
                 f"{code} is used by {other['name']!r} and {paint['name']!r}. "
                 "Assign a different explicit id suffix."
             )
@@ -126,17 +127,18 @@ def _build_catalog(data: dict) -> tuple[list[dict], int]:
     return catalog, suggested_count
 
 
-def generate(manifest_path: Path, clean: bool = False, check: bool = False) -> Path:
+def generate(manifest_path: Path, clean: bool = False, check: bool = False, *, official: bool = False) -> Path:
     manifest_path = manifest_path.resolve()
     if not manifest_path.exists():
         raise FileNotFoundError(f"Manifest not found: {manifest_path}")
     repo_root = manifest_path.parent
-    data = load_manifest(manifest_path)
+    data = load_manifest(manifest_path, official=official)
     appearance_cfg = load_appearance_profiles(repo_root)
     pattern_scales = load_pattern_scales(data)
     catalog, suggested_count = _build_catalog(data)
 
     if check:
+        print(f"Pack: {data['pack']['prefix']} - {data['pack']['name']}")
         for item in catalog:
             marker = "SUGGESTED" if item["id_source"] == "suggested" else "explicit"
             print(f"{item['code']:<16} {item['type']:<12} {marker:<9} {item['name']}")
@@ -188,7 +190,9 @@ def generate(manifest_path: Path, clean: bool = False, check: bool = False) -> P
         json.dumps(
             {
                 "generator_version": __version__,
-                "id_scheme": "PZ-T-CUSTOM",
+                "paint_pack_api": 1,
+                "id_scheme": "<PREFIX>-<TYPE>-<SUFFIX>",
+                "pack": data["pack"],
                 "appearance_profiles": appearance_cfg,
                 "pattern_scales": [scale for scale, _ in pattern_scales],
                 "paints": catalog,
@@ -197,7 +201,7 @@ def generate(manifest_path: Path, clean: bool = False, check: bool = False) -> P
         ) + "\n",
         encoding="utf-8",
     )
-    emit_dayz(catalog, data.get("dayz", {}), out / "dayz", [scale for scale, _ in pattern_scales])
+    emit_dayz(catalog, data["pack"], data.get("dayz", {}), out / "dayz", official=official)
     if suggested_count:
         print(f"WARNING: {suggested_count} paint(s) use generated ID suggestions. Add explicit 'id' values before release.")
     print(f"Generated {len(catalog)} paints in {out}")
@@ -206,10 +210,15 @@ def generate(manifest_path: Path, clean: bool = False, check: bool = False) -> P
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate PaintZ can labels, finish surfaces and DayZ integration assets")
+    parser = argparse.ArgumentParser(description="Generate PaintZ can labels, finish surfaces and Paint Pack API v1 config")
     parser.add_argument("--manifest", type=Path, default=Path("paints.json"))
     parser.add_argument("--clean", action="store_true", help="remove generated output first")
     parser.add_argument("--check", action="store_true", help="validate IDs/config without rendering")
+    parser.add_argument(
+        "--official",
+        action="store_true",
+        help="allow the reserved PZ* namespace and emit official=1; intended for PaintZ official/Standard Pack content",
+    )
     parser.add_argument("--version", action="version", version=f"PaintZ PackKit {__version__}")
     return parser
 
@@ -217,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        generate(args.manifest, clean=args.clean, check=args.check)
+        generate(args.manifest, clean=args.clean, check=args.check, official=args.official)
     except (OSError, ValueError, RuntimeError) as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
     return 0
