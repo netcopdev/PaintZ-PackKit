@@ -36,9 +36,10 @@ def test_rejects_missing_pattern_file(tmp_path: Path):
         load_manifest(path)
 
 
-def test_rejects_reserved_pz_prefix_by_default(tmp_path: Path):
+@pytest.mark.parametrize("prefix", ["PZ", "PZA", "PZ9"])
+def test_rejects_reserved_pz_prefix_by_default(tmp_path: Path, prefix: str):
     path = tmp_path / "paints.json"
-    path.write_text(json.dumps(_manifest("PZ")), encoding="utf-8")
+    path.write_text(json.dumps(_manifest(prefix)), encoding="utf-8")
     with pytest.raises(ValueError, match="reserved"):
         load_manifest(path)
 
@@ -49,6 +50,13 @@ def test_official_mode_allows_pz_prefix(tmp_path: Path):
     data = load_manifest(path, official=True)
     assert data["pack"]["prefix"] == "PZ"
     assert generate(path, check=True, official=True) == tmp_path / "generated"
+
+
+def test_official_mode_rejects_non_reserved_prefix(tmp_path: Path):
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(_manifest("NCP")), encoding="utf-8")
+    with pytest.raises(ValueError, match="--official"):
+        load_manifest(path, official=True)
 
 
 def test_rejects_invalid_prefix(tmp_path: Path):
