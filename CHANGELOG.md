@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 - satellite content packs
+
+- added source-controlled `dayz.namespace_role` with `owner` as the backward-compatible default and `satellite` for multi-PBO namespace families;
+- satellite manifests require the existing namespace `owner_class` and owner/core `owner_patch` linkage;
+- satellite config omits `CfgPaintZPacks`, registers finishes against the existing owner, and depends on both `PaintZ_DynamicPaint` and the owner/core PBO;
+- official `PZ*` satellites are supported through `--official` without emitting a second `official = 1` namespace owner;
+- kept complete finish IDs unchanged across owner/satellite packaging so moving a finish between PBOs need not break persistence;
+- added manifest-schema coverage, owner/satellite regression tests, and authoring/interoperability documentation.
+
 ## 0.2.0 - Paint Pack API v1 output
 
 - added one permanent 2-3 character pack namespace prefix and `<PREFIX>-<TYPE>-<SUFFIX>` finish IDs;
