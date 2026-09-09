@@ -150,7 +150,9 @@ def _prepare_svg(surface: Image.Image, paint: dict, code: str, repo_root: Path) 
     name = str(paint["name"]).upper()
     code_text = str(code).upper()
     paint_type = str(paint.get("type", "")).lower()
-    if paint_type == "camo":
+    if paint_type == "basic":
+        series = "BASIC SERIES"
+    elif paint_type == "camo":
         series = "CAMO SERIES"
     elif paint.get("pattern"):
         series = "PATTERN SERIES"
