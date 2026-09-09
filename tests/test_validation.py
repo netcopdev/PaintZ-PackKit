@@ -66,6 +66,42 @@ def test_rejects_invalid_prefix(tmp_path: Path):
         load_manifest(path)
 
 
+def test_satellite_requires_owner_class(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "satellite", "owner_patch": "NCP_Owner_Patch"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="owner_class is required"):
+        load_manifest(path)
+
+
+def test_satellite_requires_owner_patch(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "satellite", "owner_class": "NCP_Owner"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="owner_patch is required"):
+        load_manifest(path)
+
+
+def test_owner_pack_rejects_owner_patch(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"owner_patch": "NCP_Owner_Patch"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="only valid"):
+        load_manifest(path)
+
+
+def test_rejects_unknown_namespace_role(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "child"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="namespace_role"):
+        load_manifest(path)
+
+
 def test_duplicate_complete_finish_id_is_rejected(tmp_path: Path):
     data = _manifest()
     data["paints"] = [
