@@ -52,6 +52,23 @@ def normalize_hex(value: str) -> str:
     return value
 
 
+def normalize_prefix(value: str, *, allow_reserved_pz: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TypeError("PaintZ pack prefix must be a string")
+    prefix = value.strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9]{1,2}", prefix):
+        raise ValueError(
+            f"Invalid PaintZ pack prefix {value!r}; use 2-3 uppercase letters/digits "
+            "with a letter first"
+        )
+    if prefix.startswith("PZ") and not allow_reserved_pz:
+        raise ValueError(
+            f"PaintZ pack prefix {prefix!r} is reserved for official PaintZ content; "
+            "use --official only for the PaintZ Standard Pack/official content"
+        )
+    return prefix
+
+
 def type_code(paint_type: str) -> str:
     try:
         return TYPE_CODES[paint_type.casefold()]
@@ -64,6 +81,16 @@ def _ascii_words(value: str) -> list[str]:
     value = unicodedata.normalize("NFKD", value)
     value = value.encode("ascii", "ignore").decode("ascii")
     return re.findall(r"[A-Z0-9]+", value.upper())
+
+
+def config_token(value: str) -> str:
+    words = _ascii_words(value)
+    token = "_".join(words)
+    if not token:
+        raise ValueError(f"Cannot derive a DayZ config token from {value!r}")
+    if token[0].isdigit():
+        token = "P_" + token
+    return token
 
 
 def normalize_suffix(value: str) -> str:
@@ -121,9 +148,9 @@ def suffix_for_paint(paint: dict) -> tuple[str, bool]:
     return suggest_suffix(paint.get("name", "")), True
 
 
-def code_for_paint(paint: dict) -> tuple[str, bool]:
+def code_for_paint(paint: dict, prefix: str) -> tuple[str, bool]:
     suffix, suggested = suffix_for_paint(paint)
-    return f"PZ-{type_code(paint['type'])}-{suffix}", suggested
+    return f"{prefix}-{type_code(paint['type'])}-{suffix}", suggested
 
 
 def code_to_slug(code: str) -> str:
