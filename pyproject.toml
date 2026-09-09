@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paintz-packkit"
+version = "0.1.0"
+description = "Offline authoring and generation toolkit for PaintZ paint packs"
+requires-python = ">=3.10"
+dependencies = [
+    "Pillow>=10.0,<13",
+    "resvg_py",
+]
+
+[project.scripts]
+paintz-packkit = "paintz_packkit.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
