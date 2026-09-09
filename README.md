@@ -39,7 +39,7 @@ python tools\generate_paints.py --manifest E:\MyPaintPack\paints.json --check
 
 ## Paint Pack API v1 identity
 
-Each pack chooses one permanent public namespace prefix:
+Each namespace family uses one permanent public prefix:
 
 ```text
 ^[A-Z][A-Z0-9]{1,2}$
@@ -68,13 +68,13 @@ NCP-C-FTN
 
 The complete short finish ID is the canonical PaintZ runtime and persisted identity. PackKit does not generate a second reverse-domain identity, UUID, secret, or ownership token.
 
-All valid `PZ*` prefixes are reserved for official PaintZ content. Normal generation rejects them. The PaintZ Standard Pack/official content uses the explicit `--official` option, which permits the reserved namespace and emits `official = 1` in the namespace declaration. This is an interoperability gate, not a security mechanism.
+All valid `PZ*` prefixes are reserved for official PaintZ content. Normal generation rejects them. Official owner or satellite content uses the explicit `--official` option, which permits the reserved namespace. An owner declaration generated in official mode receives `official = 1`; a satellite emits no owner declaration at all. This is an interoperability gate, not a security mechanism.
 
-Changing a released pack prefix or complete finish ID is a breaking persistence change.
+Changing a released pack prefix or complete finish ID is a breaking persistence change. Moving an unchanged finish between PBOs inside the same namespace family is packaging-only when its complete ID remains unchanged.
 
 ## Manifest
 
-A minimal solid-paint pack:
+A minimal solid-paint owner pack:
 
 ```json
 {
@@ -105,7 +105,7 @@ A minimal solid-paint pack:
 }
 ```
 
-This produces the finish ID `NCP-S-FDE`.
+`dayz.namespace_role` defaults to `owner`, so existing manifests remain owner packs without modification. This produces the finish ID `NCP-S-FDE` and one `CfgPaintZPacks` namespace-owner declaration.
 
 `id` is the finish suffix, not the complete finish ID. It must be 2-12 uppercase-alphanumeric characters after normalization; a descriptive 3-character suffix is preferred. PackKit can suggest a suffix when omitted, but release manifests should commit explicit IDs.
 
@@ -121,6 +121,53 @@ For a pattern/camouflage finish use a safe path relative to the manifest:
 ```
 
 Referenced pattern files must exist. Pattern-backed finishes receive the configured `generator.pattern_scales`; solid finishes receive only the required 100% surface.
+
+## Satellite/content packs
+
+Use satellite mode when several PBOs belong to one PaintZ namespace family. Exactly one owner/core PBO declares the namespace; every satellite references that existing owner and must not declare the namespace again.
+
+A satellite manifest uses the same `pack.prefix` as its owner and adds:
+
+```json
+{
+  "pack": {
+    "prefix": "NCP",
+    "name": "Netcop Camo Pack",
+    "author": "netcopdev"
+  },
+  "dayz": {
+    "namespace_role": "satellite",
+    "owner_class": "NCP_NetcopMilitaryPaints",
+    "owner_patch": "NCP_NetcopMilitaryPaints_Patch",
+    "patch_class": "NCP_Camo_Pack",
+    "addon_root": "NCP_Camo_Pack"
+  }
+}
+```
+
+`owner_class` is the exact `CfgPaintZPacks` child classname declared by the owner/core PBO. `owner_patch` is the exact owner/core `CfgPatches` classname used for DayZ dependency ordering.
+
+Generated satellite config:
+
+- omits `CfgPaintZPacks` entirely;
+- keeps complete finish IDs unchanged under the shared prefix;
+- writes each finish's `owner` property to the supplied `owner_class`;
+- adds both `PaintZ_DynamicPaint` and `owner_patch` to `requiredAddons[]`;
+- generates its own textures, can classes, finish-registration config children, and CE type entries.
+
+For official content under `PZ`, use the same model with `--official`. For example an official camo satellite can use:
+
+```json
+"dayz": {
+  "namespace_role": "satellite",
+  "owner_class": "PZ_PaintZStandardPack",
+  "owner_patch": "PaintZ_Standard_Pack",
+  "patch_class": "PaintZ_Official_Camo_Pack",
+  "addon_root": "PaintZ_Official_Camo_Pack"
+}
+```
+
+A finish moved from the Standard Pack into that satellite may remain `PZ-C-FTN`. Existing persisted PaintZ state continues to identify the same logical finish. Changing it to another reserved namespace such as `PZA-C-FTN` would instead be a breaking finish-ID change.
 
 ## Pack workspace
 
@@ -154,7 +201,7 @@ generated/
 
 ## Generated DayZ contract
 
-PackKit now emits a standalone API-v1 `generated/dayz/config.cpp` containing:
+For the default owner role, PackKit emits an API-v1 `generated/dayz/config.cpp` containing:
 
 - `CfgPatches` with `requiredAddons[] = {"PaintZ_DynamicPaint"}`;
 - exactly one `CfgPaintZPacks` namespace-owner declaration;
@@ -162,6 +209,8 @@ PackKit now emits a standalone API-v1 `generated/dayz/config.cpp` containing:
 - explicit `Surfaces` entries for every generated runtime surface variant;
 - thin spawnable spray-can subclasses of `PaintZ_SprayCanBase` using `paintzFinish`;
 - no generated painting mechanics.
+
+For satellite role, the same finish/config content is generated except there is no `CfgPaintZPacks` declaration and the owner/core patch is added to `requiredAddons[]`.
 
 A representative can is conceptually:
 
@@ -194,7 +243,7 @@ PaintZ validates the actually loaded set at runtime:
 - duplicate complete finish ID -> that finish disabled;
 - no first-loaded-wins or last-loaded-wins overwrite behavior.
 
-The generated owner config classname is a deterministic linkage key, not another public identity or security credential.
+The generated owner config classname is a deterministic linkage key, not another public identity or security credential. Satellite mode exists specifically so additional PBOs in the same family can contribute finishes without creating another namespace owner.
 
 ## Can design and fonts
 
@@ -240,7 +289,7 @@ python -m pip install pytest
 pytest -q
 ```
 
-High-value tests cover namespaced IDs, reserved `PZ*` rejection, explicit official mode, standalone API-v1 config generation, duplicate IDs, and explicit pattern-scale registration.
+High-value tests cover namespaced IDs, reserved `PZ*` rejection, owner and satellite API-v1 config generation, explicit official mode, duplicate IDs, and explicit pattern-scale registration.
 
 See `AGENTS.md` and `docs/INTEROPERABILITY.md` before changing runtime-facing output.
 
