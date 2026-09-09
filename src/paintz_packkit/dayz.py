@@ -48,6 +48,9 @@ def _finish_config_class(owner_class: str, item: dict) -> str:
 
 
 def _surface_texture_path(surface_root: str, variant: dict) -> str:
+    procedural = variant.get("procedural_texture")
+    if procedural:
+        return procedural
     return surface_root + "\\" + variant["texture_stem"] + "_co.paa"
 
 
