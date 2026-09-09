@@ -30,12 +30,19 @@ def load_manifest(path: Path, *, official: bool = False) -> dict:
         raise ValueError("pack.name is required")
     pack["name"] = pack_name
     pack["prefix"] = normalize_prefix(str(pack.get("prefix", "")), allow_reserved_pz=official)
+    if official and not pack["prefix"].startswith("PZ"):
+        raise ValueError("--official may only be used with a reserved PZ* pack prefix")
 
     if "author" in pack:
         author = str(pack["author"]).strip()
         if not author:
             raise ValueError("pack.author cannot be empty")
         pack["author"] = author
+
+    generator = data.get("generator", {})
+    if not isinstance(generator, dict):
+        raise ValueError("generator must be an object")
+    data["generator"] = generator
 
     dayz = data.get("dayz", {})
     if not isinstance(dayz, dict):
