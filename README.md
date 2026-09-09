@@ -2,7 +2,7 @@
 
 PaintZ PackKit is the offline authoring/generation toolkit for [PaintZ](https://github.com/netcopdev/PaintZ).
 
-It turns one paint-pack manifest plus source artwork into standardized can textures, runtime surface textures, previews, a machine-readable catalogue, and DayZ config targeting **Paint Pack API v1**.
+It turns one paint-pack manifest plus source artwork into standardized can textures, runtime surface representations, previews, a machine-readable catalogue, and DayZ config targeting **Paint Pack API v1**.
 
 PackKit is not a PaintZ runtime dependency. A finished paint pack depends on PaintZ; PaintZ does not depend on PackKit or on any specific paint pack.
 
@@ -62,6 +62,7 @@ Every finish ID is derived as:
 For example:
 
 ```text
+NCP-B-BLK
 NCP-S-FDE
 NCP-C-FTN
 ```
@@ -72,9 +73,30 @@ All valid `PZ*` prefixes are reserved for official PaintZ content. Normal genera
 
 Changing a released pack prefix or complete finish ID is a breaking persistence change.
 
+### Finish types
+
+The current type codes include:
+
+```text
+B  Basic       plain RGB only; procedural target surface; no added treatment
+S  Solid       one-color asset-backed finish with optional wear/noise/detail
+C  Camouflage
+P  Pattern
+M  Metallic
+R  Rusted
+W  Weathered
+F  Fluorescent
+X  Special/Custom
+T  Transparent/Tint
+```
+
+`B` and `S` are intentionally different even though both may represent one nominal color. Basic means **just the color**. Solid means a one-color finish whose generated texture may add scratches, grain, grime, edge wear, rust hints, or other surface character.
+
 ## Manifest
 
-A minimal solid-paint pack:
+### Minimal Basic finish
+
+A Basic finish is defined by a color and does not generate a target-surface texture asset:
 
 ```json
 {
@@ -84,30 +106,46 @@ A minimal solid-paint pack:
     "name": "Netcop Military Paints",
     "author": "netcopdev"
   },
-  "generator": {
-    "label_size": [1024, 1024],
-    "surface_size": [1024, 1024],
-    "pattern_scales": [0.5, 0.75, 1.0, 1.5, 2.0, 3.0]
-  },
-  "dayz": {
-    "addon_root": "NCP_MilitaryPaints",
-    "types_nominal": 0,
-    "types_lifetime": 14400
-  },
   "paints": [
     {
-      "id": "FDE",
-      "name": "Flat Dark Earth",
-      "type": "solid",
-      "color": "#5A4F46"
+      "id": "BLK",
+      "name": "Basic Black",
+      "type": "basic",
+      "color": "#262827"
     }
   ]
 }
 ```
 
-This produces the finish ID `NCP-S-FDE`.
+This produces the finish ID `NCP-B-BLK`. PackKit emits a DayZ procedural color descriptor for the runtime S100 surface. The spray-can label/texture is still generated normally.
+
+Basic finishes:
+
+- require `color`;
+- cannot use `pattern`;
+- cannot use `appearance_profile`;
+- always use one 100% procedural surface;
+- do not generate a target-surface PNG/PAA.
+
+### Solid finish
+
+A Solid finish remains asset-backed and may use an appearance profile:
+
+```json
+{
+  "id": "FDE",
+  "name": "Flat Dark Earth",
+  "type": "solid",
+  "color": "#5A4F46",
+  "appearance_profile": "used"
+}
+```
+
+This produces `NCP-S-FDE` and a generated 100% target-surface image suitable for conversion to PAA.
 
 `id` is the finish suffix, not the complete finish ID. It must be 2-12 uppercase-alphanumeric characters after normalization; a descriptive 3-character suffix is preferred. PackKit can suggest a suffix when omitted, but release manifests should commit explicit IDs.
+
+### Pattern/camouflage finish
 
 For a pattern/camouflage finish use a safe path relative to the manifest:
 
@@ -120,7 +158,7 @@ For a pattern/camouflage finish use a safe path relative to the manifest:
 }
 ```
 
-Referenced pattern files must exist. Pattern-backed finishes receive the configured `generator.pattern_scales`; solid finishes receive only the required 100% surface.
+Referenced pattern files must exist. Pattern-backed finishes receive the configured `generator.pattern_scales`; non-pattern asset-backed finishes receive only the required 100% surface.
 
 ## Pack workspace
 
@@ -141,7 +179,7 @@ Generation writes only to the workspace's `generated/` directory:
 ```text
 generated/
   labels/
-  surfaces/
+  surfaces/              # asset-backed target surfaces only; Basic has none
   previews/
   dayz/
     config.cpp
@@ -154,24 +192,35 @@ generated/
 
 ## Generated DayZ contract
 
-PackKit now emits a standalone API-v1 `generated/dayz/config.cpp` containing:
+PackKit emits a standalone API-v1 `generated/dayz/config.cpp` containing:
 
 - `CfgPatches` with `requiredAddons[] = {"PaintZ_DynamicPaint"}`;
 - exactly one `CfgPaintZPacks` namespace-owner declaration;
 - one `CfgPaintZFinishes` registration per finish;
-- explicit `Surfaces` entries for every generated runtime surface variant;
+- explicit `Surfaces` entries for every runtime surface representation;
+- procedural S100 descriptors for Basic finishes;
+- texture paths for asset-backed finishes;
 - thin spawnable spray-can subclasses of `PaintZ_SprayCanBase` using `paintzFinish`;
 - no generated painting mechanics.
 
-A representative can is conceptually:
+A representative Basic registration is conceptually:
 
 ```cpp
-class NCP_NETCOPDEV_NETCOP_MILITARY_PAINTS_SprayCan_FDE : PaintZ_SprayCanBase
+class NCP_B_BLK
 {
-    scope = 2;
-    displayName = "PaintZ - Flat Dark Earth";
-    paintzFinish = "NCP-S-FDE";
-    hiddenSelectionsTextures[] = {"NCP_MilitaryPaints\\data\\cans\\ncp_s_fde_co.paa"};
+    id = "NCP-B-BLK";
+    owner = "NCP_NetcopMilitaryPaints";
+    displayName = "Basic Black";
+    type = "basic";
+
+    class Surfaces
+    {
+        class S100
+        {
+            scalePercent = 100;
+            texture = "#(argb,8,8,3)color(0.149020,0.156863,0.152941,1.0,CO)";
+        };
+    };
 };
 ```
 
@@ -181,7 +230,13 @@ Normal API-v1 output does **not** generate:
 - `PaintZ_PaintCatalog` Enforce source;
 - per-finish action registration/attachment logic.
 
-PaintZ's tested generic action/runtime registry resolves the held can's `paintzFinish` instead.
+PaintZ's generic action/runtime registry resolves the held can's `paintzFinish` instead.
+
+## Spray-can classnames
+
+Each finish gets one unique DayZ spray-can classname. Complete finish IDs remain unique by prefix + type + suffix, so `NCP-B-FDE` and `NCP-S-FDE` are valid distinct finish IDs.
+
+If a pack uses the same suffix in more than one type, make sure the generated can classnames remain distinct. PackKit detects generated classname collisions. An explicit `dayz_class` may be supplied where compatibility or a legacy classname requires it.
 
 ## Namespace collision model
 
@@ -212,7 +267,7 @@ Font binaries are not committed. Authors can place licensed local copies there o
 
 For compatibility, the original `PAINTZ_FONT*` variables are also recognized. If Barlow is absent, the generator falls back to common system fonts.
 
-Reusable grime/scratch/rust/edge-wear overlays are optional. If a pack workspace supplies them under `assets/overlays/`, PackKit uses them; otherwise generation retains the deterministic grain layer without requiring unavailable binary assets.
+Reusable grime/scratch/rust/edge-wear overlays are optional for asset-backed finishes. Basic finishes never apply the appearance stack.
 
 ## Pattern scaling
 
@@ -220,16 +275,18 @@ Reusable grime/scratch/rust/edge-wear overlays are optional. If a pack workspace
 
 The generated finish registration declares only variants that actually exist. PaintZ does not invent third-party texture paths or assume undeclared scales exist.
 
+Basic finishes are not pattern-scaled and always expose only S100.
+
 ## Current limitations
 
-PackKit currently generates PNG source assets and DayZ config/source, but does not yet:
+PackKit generates PNG source assets and DayZ config/source, but does not itself:
 
-- convert PNG textures to PAA;
+- convert generated PNG textures to PAA;
 - pack a PBO;
 - sign a PBO;
 - assemble a complete Workshop release directory automatically.
 
-The generated `config.cpp` references the matching `.paa` names expected after a normal DayZ asset-conversion/build step.
+For asset-backed target surfaces, generated `config.cpp` references the matching `.paa` names expected after a normal DayZ asset-conversion/build step. Basic target surfaces instead use procedural descriptors and need no surface PAA.
 
 ## Development
 
@@ -240,7 +297,7 @@ python -m pip install pytest
 pytest -q
 ```
 
-High-value tests cover namespaced IDs, reserved `PZ*` rejection, explicit official mode, standalone API-v1 config generation, duplicate IDs, and explicit pattern-scale registration.
+High-value tests cover namespaced IDs, reserved `PZ*` rejection, Basic procedural generation, Basic validation rules, explicit official mode, standalone API-v1 config generation, duplicate IDs, and explicit pattern-scale registration.
 
 See `AGENTS.md` and `docs/INTEROPERABILITY.md` before changing runtime-facing output.
 
