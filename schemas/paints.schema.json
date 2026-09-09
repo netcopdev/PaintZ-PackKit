@@ -32,14 +32,31 @@
       "type": "object",
       "properties": {
         "emit_config_fragment": {"type": "boolean"},
+        "namespace_role": {"enum": ["owner", "satellite"]},
         "addon_root": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "patch_class": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "owner_class": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "owner_patch": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "base_class": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "class_prefix": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "types_nominal": {"type": "integer", "minimum": 0},
         "types_lifetime": {"type": "integer", "minimum": 0}
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"namespace_role": {"const": "satellite"}},
+            "required": ["namespace_role"]
+          },
+          "then": {"required": ["owner_class", "owner_patch"]}
+        },
+        {
+          "if": {
+            "properties": {"namespace_role": {"const": "owner"}}
+          },
+          "then": {"not": {"required": ["owner_patch"]}}
+        }
+      ],
       "additionalProperties": false
     },
     "paints": {
