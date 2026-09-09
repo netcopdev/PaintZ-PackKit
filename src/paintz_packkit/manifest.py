@@ -7,6 +7,7 @@ from pathlib import Path
 from .ids import TYPE_CODES, normalize_hex, normalize_prefix, normalize_suffix
 
 _CONFIG_CLASS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_NAMESPACE_ROLES = {"owner", "satellite"}
 
 
 def _require_config_class(value: object, label: str) -> str:
@@ -49,16 +50,32 @@ def load_manifest(path: Path, *, official: bool = False) -> dict:
         raise ValueError("dayz must be an object when present")
     data["dayz"] = dayz
 
+    namespace_role = str(dayz.get("namespace_role", "owner")).strip().casefold()
+    if namespace_role not in _NAMESPACE_ROLES:
+        allowed = ", ".join(sorted(_NAMESPACE_ROLES))
+        raise ValueError(f"dayz.namespace_role must be one of: {allowed}")
+    dayz["namespace_role"] = namespace_role
+
     if "addon_root" in dayz:
         dayz["addon_root"] = _require_config_class(dayz["addon_root"], "dayz.addon_root")
     if "patch_class" in dayz:
         dayz["patch_class"] = _require_config_class(dayz["patch_class"], "dayz.patch_class")
     if "owner_class" in dayz:
         dayz["owner_class"] = _require_config_class(dayz["owner_class"], "dayz.owner_class")
+    if "owner_patch" in dayz:
+        dayz["owner_patch"] = _require_config_class(dayz["owner_patch"], "dayz.owner_patch")
     if "class_prefix" in dayz:
         dayz["class_prefix"] = _require_config_class(dayz["class_prefix"], "dayz.class_prefix")
     if "base_class" in dayz:
         dayz["base_class"] = _require_config_class(dayz["base_class"], "dayz.base_class")
+
+    if namespace_role == "satellite":
+        if "owner_class" not in dayz:
+            raise ValueError("dayz.owner_class is required when dayz.namespace_role is 'satellite'")
+        if "owner_patch" not in dayz:
+            raise ValueError("dayz.owner_patch is required when dayz.namespace_role is 'satellite'")
+    elif "owner_patch" in dayz:
+        raise ValueError("dayz.owner_patch is only valid when dayz.namespace_role is 'satellite'")
 
     paints = data.get("paints")
     if not isinstance(paints, list) or not paints:
