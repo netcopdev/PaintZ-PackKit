@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+generated/
+
+# User paint content belongs in pack workspaces, not in PackKit itself.
+paints.json
+assets/pattern_sources/
+assets/overlays/
+
+# Optional local canonical fonts; see assets/fonts/README.md.
+assets/fonts/*.ttf
+assets/fonts/*.otf
