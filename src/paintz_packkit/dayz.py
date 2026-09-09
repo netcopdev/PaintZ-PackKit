@@ -94,8 +94,9 @@ def emit_dayz(
         "        units[] =",
         "        {",
     ]
-    for item in catalog:
-        lines.append(f'            "{_config_class(item, class_prefix)}",')
+    for index, item in enumerate(catalog):
+        comma = "," if index < len(catalog) - 1 else ""
+        lines.append(f'            "{_config_class(item, class_prefix)}"{comma}')
     lines += [
         "        };",
         "        weapons[] = {};",
