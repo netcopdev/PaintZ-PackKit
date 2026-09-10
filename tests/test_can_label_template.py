@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 from PIL import Image
 
-from paintz_packkit.svg_label import RED_HEX, _prepare_svg
+from paintz_packkit.svg_label import CAN_LABEL_ROTATION_DEG, RED_HEX, _prepare_svg, _rotate_label_around_can
 
 
 def test_design3_curated_geometry_is_preserved():
@@ -61,3 +61,29 @@ def test_prepared_svg_preserves_red_z_logo_child():
     assert (elements["logo"].text or "").strip() == "Paint"
     assert (elements["logo-z"].text or "").strip() == "Z"
     assert elements["logo-z"].get("fill") == RED_HEX
+
+
+def test_default_can_label_rotation_is_eight_degrees_with_wraparound():
+    assert CAN_LABEL_ROTATION_DEG == 8.0
+
+    image = Image.new("RGBA", (360, 2), (0, 0, 0, 0))
+    marker = (255, 0, 0, 255)
+    image.putpixel((358, 0), marker)
+
+    rotated = _rotate_label_around_can(image)
+
+    # At 360 px wide, 8 degrees is exactly an 8 px shift to the right.
+    # ImageChops.offset wraps across the horizontal seam, as a cylindrical label must.
+    assert rotated.getpixel((6, 0)) == marker
+    assert rotated.getpixel((358, 0)) != marker
+
+
+def test_can_label_rotation_scales_with_texture_width():
+    image = Image.new("RGBA", (1024, 1), (0, 0, 0, 0))
+    marker = (255, 255, 255, 255)
+    image.putpixel((100, 0), marker)
+
+    rotated = _rotate_label_around_can(image)
+
+    # round(1024 * 8 / 360) == 23
+    assert rotated.getpixel((123, 0)) == marker
