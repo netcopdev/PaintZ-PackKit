@@ -25,6 +25,14 @@ Implementation permission is not merge permission. Do not merge, squash, rebase 
 
 When work is complete, report the branch, relevant commits, tests performed, and anything still requiring real DayZ Tools/runtime verification.
 
+## Documentation progression
+
+Documentation must progress in parallel with implementation. A feature, fix, schema change, generator change, validation change, configuration change, workflow change, or public-contract change must update the relevant README/docs/schema guidance on the same work branch before that work is considered complete.
+
+Merge implementation and its documentation together. Do not knowingly merge generator/code changes first and leave documentation describing an older input/output contract for a later cleanup branch.
+
+A purely internal change with no author-, contributor-, build-, generated-output-, or API-visible effect may require no documentation edit, but that must be a deliberate no-documentation-impact determination rather than an omission.
+
 ## Architecture boundary
 
 Dependency direction is:
@@ -114,7 +122,7 @@ The explicit `--official` path currently means **independent official content in
 - reject `dayz.owner_patch`;
 - accept an explicit `dayz.owner_class` only when it equals `PZ_PaintZOfficial`.
 
-Do not create dependencies such as Military -> Standard or Pastel -> Standard merely to access `PZ`. Standard, Pastel, Military, Hunting and other official content packs are peers and each depends directly on PaintZ.
+Do not create dependencies such as Field -> Standard, Vanilla -> Standard, Hunter -> Standard, or Pastel -> Standard merely to access `PZ`. Standard, Field, Vanilla, Hunter, Pastel and future official content packs are peers and each depends directly on PaintZ.
 
 Do not encode content categories by consuming `PZA`, `PZM`, `PZH`, etc. The package/collection name and the canonical finish namespace are separate concerns.
 
@@ -185,7 +193,7 @@ Generated owner/config classnames are config linkage/local keys, not another Pai
 
 PaintZ core owns the common can model/UV/runtime behaviour and standard PaintZ label identity. PackKit generates finish-specific can artwork and thin config subclasses.
 
-Standard templates retain PaintZ-controlled layout, logo/identity, geometry, typography rules, badge placement, margins and footer treatment.
+Standard templates retain PaintZ-controlled layout, logo/identity, geometry, typography rules, badge placement, margins and footer treatment. The Design 3 template and renderer must preserve a visible `PaintZ` top logo, including the distinct red `Z`, on generated can labels.
 
 Pack-controlled fields may include finish name/ID/type, publisher name, small publisher mark, and restrained collection/series text. Do not expose arbitrary coordinates, unrestricted fonts, free-form geometry or replacement of the common can model as normal manifest fields.
 
@@ -249,13 +257,14 @@ High-value automated coverage includes:
 - representative Solid and patterned finishes;
 - explicit scale declarations;
 - safe/missing source paths;
-- Windows/path edge cases.
+- Windows/path edge cases;
+- standard can-label logo presence/placement.
 
 Do not claim an AddonBuilder/PBO or DayZ runtime compile unless it was actually run with those tools.
 
 ## Documentation contract
 
-Keep `README.md`, schema files and `docs/INTEROPERABILITY.md` aligned with author-facing behavior. Long instructions belong in documentation rather than comment-heavy JSON examples.
+Keep `README.md`, schema files, `docs/MANIFEST_V1.md`, and `docs/INTEROPERABILITY.md` aligned with author-facing behavior and generated output. Long instructions belong in documentation rather than comment-heavy JSON examples.
 
 Examples should be valid PackKit inputs whenever practical.
 

@@ -69,7 +69,7 @@ The `--official` generation path therefore has strict semantics:
 - only `PZ` is currently accepted;
 - generated config emits no `CfgPaintZPacks` declaration;
 - every generated `PZ-*` finish uses `owner = "PZ_PaintZOfficial"`;
-- generated `CfgPatches.requiredAddons[]` contains `PaintZ_DynamicPaint` but no Standard/Military/Pastel/Hunting owner dependency;
+- generated `CfgPatches.requiredAddons[]` contains `PaintZ_DynamicPaint` but no content-pack owner dependency;
 - `dayz.namespace_role = "satellite"` is rejected for official content;
 - `dayz.owner_patch` is rejected for official content;
 - an explicit `dayz.owner_class`, if present, must equal `PZ_PaintZOfficial`;
@@ -79,9 +79,10 @@ This permits peer official packages such as:
 
 ```text
 PaintZ Standard Pack -> PaintZ
+PaintZ Field Pack    -> PaintZ
+PaintZ Vanilla Pack  -> PaintZ
+PaintZ Hunter Pack   -> PaintZ
 PaintZ Pastel Pack   -> PaintZ
-PaintZ Military Pack -> PaintZ
-PaintZ Hunting Pack  -> PaintZ
 ```
 
 All may contain unique `PZ-*` finishes. None is a parent or mandatory base pack for the others.
@@ -107,7 +108,7 @@ Example:
 ```json
 {
   "id": "BLK",
-  "name": "Basic Black",
+  "name": "Black",
   "type": "basic",
   "color": "#262827"
 }
@@ -187,13 +188,19 @@ For asset-backed finishes:
 
 PackKit creates PNG source assets for asset-backed finishes; conversion to PAA/PBO packaging remains a separate pack-build step.
 
+## Standard can-label contract
+
+PackKit owns the shared label generator/template used by PaintZ packs. The standard Design 3 output includes the PaintZ logo at the top of the can label with a distinct red `Z`, plus finish code/name, series, badge text and footer.
+
+Shared label geometry/branding changes are generator behavior changes. Fix them in PackKit source/template rather than hand-editing generated pack assets, and cover regressions with tests where practical.
+
 ## Standard Pack relationship
 
 `netcopdev/PaintZ-Standard-Pack` is an official reference pack contributing to the core-owned `PZ` namespace.
 
-PackKit must build/validate Standard Pack through the same API-v1 machinery plus the explicit `--official` permission. Do not create a separate incompatible format for official content.
+PackKit builds/validates Standard through the same API-v1 machinery plus the explicit `--official` permission. The current Standard catalogue is a general-purpose `PZ-B-*` Basic palette; Field and Vanilla own the camouflage content transferred out of Standard.
 
-The Standard Pack may contain both `PZ-B-*` Basic colors and existing `PZ-S-*` treated Solid finishes. Adding a Basic counterpart must not repurpose or rename the corresponding Solid finish identity.
+This current catalogue state does not change the API distinction between Basic and Solid. Future approved official packs may contain asset-backed `PZ-S-*` finishes, and an existing released Solid identity must never be silently repurposed as Basic without an explicit migration decision.
 
 ## Source of truth
 

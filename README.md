@@ -6,7 +6,7 @@ It turns a paint-pack manifest plus source artwork/data into standardized can te
 
 PackKit is not a runtime dependency. A finished paint pack depends on PaintZ; PaintZ does not depend on PackKit or on any particular content pack.
 
-The authoritative runtime contract lives in PaintZ at `docs/PAINT_PACK_API.md` and `docs/PAINT_PACK_CONFIG_V1.md`. PackKit-specific obligations are summarized in `docs/INTEROPERABILITY.md`.
+The authoritative runtime contract lives in PaintZ at `docs/PAINT_PACK_API.md` and `docs/PAINT_PACK_CONFIG_V1.md`. PackKit-specific obligations are summarized in `docs/INTEROPERABILITY.md`; the author-facing manifest contract is `docs/MANIFEST_V1.md`.
 
 ## Requirements
 
@@ -86,13 +86,13 @@ A minimal Basic finish:
   "schema_version": 1,
   "pack": {
     "prefix": "NCP",
-    "name": "Netcop Military Paints",
+    "name": "Netcop Test Paints",
     "author": "netcopdev"
   },
   "paints": [
     {
       "id": "BLK",
-      "name": "Basic Black",
+      "name": "Black",
       "type": "basic",
       "color": "#262827"
     }
@@ -139,7 +139,7 @@ PaintZ runtime itself owns the canonical `PZ` namespace through `PZ_PaintZOffici
 - rejects `dayz.namespace_role = "satellite"` and `dayz.owner_patch` for official content;
 - rejects unassigned reserved namespaces such as `PZA` or `PZ9` until PaintZ explicitly assigns them.
 
-This allows independent peer packages such as PaintZ Standard Pack, PaintZ Pastel Pack, PaintZ Military Pack, and PaintZ Hunting Pack to contribute unique `PZ-*` finishes without depending on one another.
+This allows independent peer packages such as PaintZ Standard Pack, PaintZ Field Pack, PaintZ Vanilla Pack, PaintZ Hunter Pack, and PaintZ Pastel Pack to contribute unique `PZ-*` finishes without depending on one another.
 
 Moving an unchanged official finish between those packs is packaging-only if its complete `PZ-*` ID remains unchanged.
 
@@ -167,7 +167,7 @@ Satellite mode supports a third-party family split across several PBOs. Exactly 
 ```json
 "dayz": {
   "namespace_role": "satellite",
-  "owner_class": "NCP_NetcopMilitaryPaints",
+  "owner_class": "NCP_NetcopPaints",
   "owner_patch": "NCP_Owner_Patch",
   "patch_class": "NCP_Camo_Satellite",
   "addon_root": "NCP_Camo_Satellite"
@@ -250,7 +250,9 @@ generated/
 
 ## Can design and pattern scaling
 
-The standard PaintZ label layout is source-controlled as SVG. PackKit controls common PaintZ presentation while manifests supply finish identity/content and restrained pack metadata.
+The standard PaintZ label layout is source-controlled as `assets/templates/can_design3.svg`. PackKit controls common PaintZ presentation while manifests supply finish identity/content and restrained pack metadata.
+
+The generated can label includes the PaintZ logo at the top with its distinct red `Z`, followed by the finish code/name and series/badge/footer information. Changes to the shared label geometry or renderer must be treated as PackKit behavior changes and covered by tests/documentation.
 
 Basic cans use `BASIC SERIES` by default. Basic finishes never apply the appearance stack and are not pattern-scaled.
 
@@ -271,9 +273,9 @@ python -m pip install pytest
 pytest -q
 ```
 
-High-value coverage includes normal namespace ownership, third-party satellites, reserved-prefix rejection, core-owned official `PZ` generation, Basic procedural generation/validation, duplicate IDs, generated classname uniqueness, and pattern-scale registration.
+High-value coverage includes normal namespace ownership, third-party satellites, reserved-prefix rejection, core-owned official `PZ` generation, Basic procedural generation/validation, duplicate IDs, generated classname uniqueness, pattern-scale registration, and shared can-label logo/template integrity.
 
-See `AGENTS.md` and `docs/INTEROPERABILITY.md` before changing runtime-facing output.
+See `AGENTS.md`, `docs/MANIFEST_V1.md`, and `docs/INTEROPERABILITY.md` before changing author-facing or runtime-facing output.
 
 ## License
 
