@@ -36,19 +36,9 @@ PaintZ runtime -X-> PackKit
 PaintZ runtime -X-> specific paint packs
 ```
 
-PaintZ owns runtime behaviour and the common spray-can implementation. PackKit owns offline generation and validation. Paint packs own finish content.
+PaintZ owns runtime behaviour, the common spray-can implementation, and the official `PZ` namespace identity. PackKit owns offline generation and validation. Paint packs own finish content.
 
-A normal generated API-v1 paint pack may contain:
-
-- exactly one namespace-owner declaration;
-- finish registrations;
-- surface textures and explicit scale variants;
-- standardized spray-can textures;
-- thin spawnable can subclasses inheriting `PaintZ_SprayCanBase`;
-- `CfgPatches` dependency metadata;
-- optional `types.xml` entries and restrained branding.
-
-A normal paint pack must not define painting actions, persistence, synchronization, target policy, or other PaintZ gameplay mechanics.
+A generated paint pack must not define painting actions, persistence, synchronization, target policy, or other PaintZ gameplay mechanics.
 
 ## Paint Pack API v1 identity
 
@@ -67,72 +57,113 @@ NCP-C-FTN
 NCP-S-FDE
 ```
 
+Package/repository/PBO names are not part of finish identity. Moving an unchanged finish between packages is not an identity change when the complete finish ID is retained.
+
 Do **not** introduce a second reverse-domain canonical ID, UUID, secret, generated ownership token, or online registry identifier as a requirement.
 
-### Prefix
+## Third-party namespace roles
 
-A normal third-party pack has one permanent prefix matching:
+A normal third-party namespace family has one permanent prefix matching:
 
 ```text
 ^[A-Z][A-Z0-9]{1,2}$
 ```
 
-All valid prefixes beginning with `PZ` are reserved for official PaintZ content. Normal PackKit validation must reject them.
+All valid prefixes beginning with `PZ` are reserved for official PaintZ use. Normal PackKit validation must reject them.
 
-The PaintZ Standard Pack/official content may use `PZ*` only through the explicit `--official` generation path. That path emits `official = 1` in the namespace declaration. It is an interoperability gate, not cryptographic authentication.
+For third-party content, `dayz.namespace_role` is source-controlled architecture:
 
-Changing a released prefix is a breaking persistence/identity change.
+- omitted or `owner`: generate a normal namespace-owner pack;
+- `satellite`: generate a content PBO that contributes finishes to an existing external namespace owner.
 
-### Type and suffix
+A third-party owner emits exactly one `CfgPaintZPacks` declaration and requires `PaintZ_DynamicPaint`.
 
-Keep the established type letters:
+A third-party satellite must provide:
+
+- `dayz.owner_class`: exact existing `CfgPaintZPacks` child classname;
+- `dayz.owner_patch`: exact owner/core `CfgPatches` classname.
+
+Satellite output must:
+
+- omit `CfgPaintZPacks`;
+- set each finish's `owner` to `dayz.owner_class`;
+- require both `PaintZ_DynamicPaint` and `dayz.owner_patch`;
+- use deterministic local config child names;
+- never redeclare the namespace merely to become self-contained.
+
+## Official `PZ` generation
+
+PaintZ runtime itself permanently owns the official `PZ` namespace through:
 
 ```text
-S C P M R W F X T
+PZ_PaintZOfficial
 ```
 
-Finish suffixes are uppercase alphanumeric, 2-12 characters, with descriptive 3-character suffixes preferred. Changing a released complete finish ID is a breaking persistence change.
+Official PaintZ content packs are independent contributors, not namespace owners and not satellites of another content pack.
 
-IDs and generated classnames must be deterministic from authoritative input. Never derive identity from timestamps, random values or unordered traversal.
+The explicit `--official` path currently means **independent official content in the core-owned `PZ` namespace**. It must:
+
+- accept `PZ` and reject ordinary third-party prefixes;
+- reject unassigned reserved namespaces such as `PZA`/`PZ9` until PaintZ explicitly assigns them;
+- emit no `CfgPaintZPacks` owner declaration;
+- set every finish's `owner` to `PZ_PaintZOfficial`;
+- require `PaintZ_DynamicPaint` only;
+- reject `dayz.namespace_role = "satellite"`;
+- reject `dayz.owner_patch`;
+- accept an explicit `dayz.owner_class` only when it equals `PZ_PaintZOfficial`.
+
+Do not create dependencies such as Military -> Standard or Pastel -> Standard merely to access `PZ`. Standard, Pastel, Military, Hunting and other official content packs are peers and each depends directly on PaintZ.
+
+Do not encode content categories by consuming `PZA`, `PZM`, `PZH`, etc. The package/collection name and the canonical finish namespace are separate concerns.
 
 ## Runtime collision semantics PackKit must target
 
-PackKit validates local syntax and local duplicates. It cannot know whether every independent Workshop pack already uses a chosen prefix.
-
-PaintZ performs runtime collision detection against the complete loaded set:
+PaintZ validates the complete loaded set:
 
 - one namespace owner for a prefix -> namespace valid;
 - multiple owners for one prefix -> entire namespace disabled;
 - duplicate complete finish ID -> that finish disabled;
 - no first-loaded-wins or last-loaded-wins overwrite behavior.
 
-Do not imply PackKit can globally reserve or prove ownership of a prefix.
+For `PZ`, the legitimate owner is PaintZ core. Any content pack redeclaring `PZ` creates a real collision and is invalid.
 
-For future multi-PBO pack families, only one owner/core PBO declares the namespace. Satellite PBOs depend on it and do not re-declare ownership.
+PackKit validates local syntax and local duplicates. It cannot guarantee that an arbitrary third-party prefix is globally unused. Do not imply it can prove prefix ownership.
 
 ## Generated DayZ config rules
 
 Inspect the current PaintZ runtime config contract before changing runtime-facing output.
 
-API-v1 output must generate:
+Third-party owner output generates:
 
 - `CfgPatches.requiredAddons[]` including `PaintZ_DynamicPaint`;
 - one `CfgPaintZPacks` owner declaration;
 - one `CfgPaintZFinishes` child per finish;
-- exact `owner` linkage to the generated owner config class;
-- explicit `Surfaces` declarations for every runtime asset PaintZ may choose;
-- a 100% surface for every finish;
+- exact owner linkage;
+- explicit runtime surface declarations;
+- mandatory 100% surface representation;
 - only actually generated scale variants for patterns;
 - one thin spawnable can subclass per finish using `paintzFinish`.
+
+Third-party satellite output generates the same finish/can/surface content except that it emits no owner and additionally depends on the supplied external owner patch.
+
+Official `PZ` output generates the same finish/can/surface content except that it emits no owner, links every finish to `PZ_PaintZOfficial`, and has no content-pack owner dependency.
 
 Normal API-v1 output must **not** generate:
 
 - per-finish `ActionPaintZPaint_*` Enforce classes;
 - a generated `PaintZ_PaintCatalog` runtime class;
 - per-finish action registration/attachment logic;
-- painted subclasses for weapons, magazines, attachments or other targets.
+- painted subclasses for target items.
 
-The generated owner config classname is a deterministic config linkage key, not another PaintZ identity or security token. Generate distinctive owner/finish config class names because DayZ merges config trees before PaintZ enumerates them.
+Generated owner/config classnames are config linkage/local keys, not another PaintZ identity or security token. Use distinctive deterministic names because DayZ merges config trees before PaintZ enumerates them.
+
+## Finish type and suffix
+
+Keep the type mapping synchronized with the authoritative PaintZ API and runtime. Do not add or remove a type letter in PackKit alone.
+
+Finish suffixes are uppercase alphanumeric, 2-12 characters, with descriptive 3-character suffixes preferred. Changing a released complete finish ID is a breaking persistence change.
+
+IDs and generated classnames must be deterministic from authoritative input. Never derive identity from timestamps, random values or unordered traversal.
 
 ## Spray-can design and branding
 
@@ -148,8 +179,6 @@ Generated files are derived artifacts. Never hand-edit generated output to fix a
 
 Generation must be deterministic and offline-capable. Avoid timestamps, random IDs, machine-specific absolute paths and environment-dependent ordering in generated content.
 
-The existing `PaintZ/tools/paintzgen` implementation is proven source material. Preserve useful rendering/output behaviour where the API-v1 contract does not intentionally replace it.
-
 The primary authoring environment is Windows. Avoid Unix-only workflows and handle Windows filesystem paths separately from emitted DayZ/PBO paths.
 
 ## Validation-first behavior
@@ -160,6 +189,8 @@ Validate as applicable:
 
 - manifest/schema version;
 - pack prefix syntax and reserved-prefix rules;
+- third-party owner/satellite requirements;
+- official core-owned `PZ` requirements;
 - finish suffix/type syntax;
 - complete finish-ID uniqueness;
 - generated classname uniqueness;
@@ -181,14 +212,17 @@ Generated output must remain under the selected build/output root. Never delete 
 
 ## Tests and verification
 
-Add automated tests for generator behavior where practical. High-value coverage includes:
+High-value automated coverage includes:
 
 - namespaced IDs and normalization;
 - reserved `PZ*` rejection in normal mode;
-- explicit official `PZ` generation;
+- independent official `PZ` generation with `PZ_PaintZOfficial`;
+- rejection of official satellite/content-pack dependencies;
+- rejection of unassigned `PZ?` namespaces;
+- third-party satellite owner-class/owner-patch linkage;
 - duplicate finish IDs;
-- deterministic owner/classname generation;
-- standalone `config.cpp` structure;
+- deterministic class generation;
+- owner, satellite and official config structure;
 - absence of legacy generated Enforce actions/catalogue;
 - representative solid and patterned finishes;
 - explicit scale declarations;
@@ -205,14 +239,6 @@ Examples should be valid PackKit inputs whenever practical.
 
 ## Avoid premature complexity
 
-Do not invent a GUI, online prefix registry, cryptographic ownership system, broad plugin framework, unrestricted theming system or runtime texture generator without a concrete requirement.
+Do not invent a GUI, online prefix registry, cryptographic ownership system, broad plugin framework, unrestricted theming system, or category-specific official namespaces without a concrete requirement.
 
-Prefer the smallest design that supports:
-
-1. one permanent pack namespace;
-2. authoritative finish definitions;
-3. standardized asset generation;
-4. thin can-class generation;
-5. explicit finish registration;
-6. validation;
-7. deterministic output.
+Prefer the smallest design that supports deterministic identity, explicit ownership, independent official content packs, third-party multi-PBO families, explicit finish registration, validation, and reproducible generation.

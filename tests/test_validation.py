@@ -44,12 +44,20 @@ def test_rejects_reserved_pz_prefix_by_default(tmp_path: Path, prefix: str):
         load_manifest(path)
 
 
-def test_official_mode_allows_pz_prefix(tmp_path: Path):
+def test_official_mode_allows_core_owned_pz_prefix(tmp_path: Path):
     path = tmp_path / "paints.json"
     path.write_text(json.dumps(_manifest("PZ")), encoding="utf-8")
     data = load_manifest(path, official=True)
     assert data["pack"]["prefix"] == "PZ"
     assert generate(path, check=True, official=True) == tmp_path / "generated"
+
+
+@pytest.mark.parametrize("prefix", ["PZA", "PZ9"])
+def test_official_mode_rejects_unassigned_reserved_namespace(tmp_path: Path, prefix: str):
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(_manifest(prefix)), encoding="utf-8")
+    with pytest.raises(ValueError, match="only the PaintZ-owned PZ namespace"):
+        load_manifest(path, official=True)
 
 
 def test_official_mode_rejects_non_reserved_prefix(tmp_path: Path):
@@ -59,10 +67,77 @@ def test_official_mode_rejects_non_reserved_prefix(tmp_path: Path):
         load_manifest(path, official=True)
 
 
+def test_official_mode_rejects_satellite_role(tmp_path: Path):
+    data = _manifest("PZ")
+    data["dayz"] = {
+        "namespace_role": "satellite",
+        "owner_class": "PZ_PaintZOfficial",
+        "owner_patch": "PaintZ_DynamicPaint",
+    }
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="independent contributors"):
+        load_manifest(path, official=True)
+
+
+def test_official_mode_rejects_content_pack_owner_dependency(tmp_path: Path):
+    data = _manifest("PZ")
+    data["dayz"] = {"owner_patch": "PaintZ_Standard_Pack"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="depend directly on PaintZ"):
+        load_manifest(path, official=True)
+
+
+def test_official_mode_rejects_wrong_owner_class(tmp_path: Path):
+    data = _manifest("PZ")
+    data["dayz"] = {"owner_class": "PZ_PaintZStandardPack"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="PZ_PaintZOfficial"):
+        load_manifest(path, official=True)
+
+
 def test_rejects_invalid_prefix(tmp_path: Path):
     path = tmp_path / "paints.json"
     path.write_text(json.dumps(_manifest("TOOLONG")), encoding="utf-8")
     with pytest.raises(ValueError, match="pack prefix"):
+        load_manifest(path)
+
+
+def test_satellite_requires_owner_class(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "satellite", "owner_patch": "NCP_Owner_Patch"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="owner_class is required"):
+        load_manifest(path)
+
+
+def test_satellite_requires_owner_patch(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "satellite", "owner_class": "NCP_Owner"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="owner_patch is required"):
+        load_manifest(path)
+
+
+def test_owner_pack_rejects_owner_patch(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"owner_patch": "NCP_Owner_Patch"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="only valid"):
+        load_manifest(path)
+
+
+def test_rejects_unknown_namespace_role(tmp_path: Path):
+    data = _manifest()
+    data["dayz"] = {"namespace_role": "child"}
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="namespace_role"):
         load_manifest(path)
 
 

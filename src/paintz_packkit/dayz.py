@@ -5,6 +5,9 @@ from xml.sax.saxutils import escape
 
 from .ids import class_suffix, config_token
 
+_OFFICIAL_PREFIX = "PZ"
+_OFFICIAL_OWNER_CLASS = "PZ_PaintZOfficial"
+
 
 def _config_class(item: dict, prefix: str) -> str:
     return item.get("dayz_class") or prefix + class_suffix(item["name"], item["code"])
@@ -23,28 +26,38 @@ def _scale_percent(scale: float) -> int:
     return percent
 
 
-def _owner_class(pack: dict, dayz: dict) -> str:
-    explicit = dayz.get("owner_class")
-    if explicit:
-        return explicit
+def _local_pack_class(pack: dict) -> str:
     identity = pack.get("author") or pack["name"]
     return f"{pack['prefix']}_{config_token(identity)}_{config_token(pack['name'])}"
 
 
-def _patch_class(pack: dict, dayz: dict, owner_class: str) -> str:
-    return dayz.get("patch_class") or f"{owner_class}_Patch"
+def _owner_class(pack: dict, dayz: dict, local_pack_class: str, *, official: bool) -> str:
+    if official:
+        explicit = dayz.get("owner_class")
+        if explicit and explicit != _OFFICIAL_OWNER_CLASS:
+            raise ValueError(f"Official PZ content must use owner class {_OFFICIAL_OWNER_CLASS}")
+        return _OFFICIAL_OWNER_CLASS
+
+    explicit = dayz.get("owner_class")
+    if explicit:
+        return explicit
+    return local_pack_class
 
 
-def _addon_root(dayz: dict, owner_class: str) -> str:
-    return dayz.get("addon_root") or owner_class
+def _patch_class(dayz: dict, default_root: str) -> str:
+    return dayz.get("patch_class") or f"{default_root}_Patch"
 
 
-def _class_prefix(dayz: dict, owner_class: str) -> str:
-    return dayz.get("class_prefix") or f"{owner_class}_SprayCan_"
+def _addon_root(dayz: dict, default_root: str) -> str:
+    return dayz.get("addon_root") or default_root
 
 
-def _finish_config_class(owner_class: str, item: dict) -> str:
-    return f"{owner_class}_{item['type_code']}_{item['id']}"
+def _class_prefix(dayz: dict, default_root: str) -> str:
+    return dayz.get("class_prefix") or f"{default_root}_SprayCan_"
+
+
+def _finish_config_class(registration_root: str, item: dict) -> str:
+    return f"{registration_root}_{item['type_code']}_{item['id']}"
 
 
 def _surface_texture_path(surface_root: str, variant: dict) -> str:
@@ -63,19 +76,48 @@ def emit_dayz(
     if not dayz.get("emit_config_fragment", True):
         return
 
-    owner_class = _owner_class(pack, dayz)
-    patch_class = _patch_class(pack, dayz, owner_class)
-    addon_root = _addon_root(dayz, owner_class)
+    requested_role = dayz.get("namespace_role", "owner")
+    if requested_role not in {"owner", "satellite"}:
+        raise ValueError(f"Unsupported PaintZ namespace role: {requested_role!r}")
+
+    if official:
+        if pack["prefix"] != _OFFICIAL_PREFIX:
+            raise ValueError(f"Official PaintZ content currently uses only the {_OFFICIAL_PREFIX} namespace")
+        if requested_role == "satellite":
+            raise ValueError("Official PZ content packs are independent contributors, not satellite packs")
+        if dayz.get("owner_patch"):
+            raise ValueError("Official PZ content packs depend directly on PaintZ and must not set dayz.owner_patch")
+        namespace_role = "official"
+    else:
+        namespace_role = requested_role
+
+    local_pack_class = _local_pack_class(pack)
+    owner_class = _owner_class(pack, dayz, local_pack_class, official=official)
+    default_root = owner_class if namespace_role == "owner" else local_pack_class
+    patch_class = _patch_class(dayz, default_root)
+    addon_root = _addon_root(dayz, default_root)
     base_class = dayz.get("base_class", "PaintZ_SprayCanBase")
-    class_prefix = _class_prefix(dayz, owner_class)
+    class_prefix = _class_prefix(dayz, default_root)
+    registration_root = owner_class if namespace_role == "owner" else local_pack_class
     can_root = addon_root + "\\data\\cans"
     surface_root = addon_root + "\\data\\surfaces"
+
+    required_addons = ["PaintZ_DynamicPaint"]
+    if namespace_role == "satellite":
+        owner_patch = dayz.get("owner_patch")
+        if not owner_patch:
+            raise ValueError("Satellite PaintZ packs require dayz.owner_patch")
+        if not dayz.get("owner_class"):
+            raise ValueError("Satellite PaintZ packs require dayz.owner_class")
+        if owner_patch == patch_class:
+            raise ValueError("Satellite PaintZ pack patch_class must differ from dayz.owner_patch")
+        required_addons.append(owner_patch)
 
     config_classes: set[str] = set()
     finish_classes: set[str] = set()
     for item in catalog:
         config_class = _config_class(item, class_prefix)
-        finish_class = _finish_config_class(owner_class, item)
+        finish_class = _finish_config_class(registration_root, item)
         if config_class in config_classes:
             raise ValueError(f"Duplicate generated DayZ classname: {config_class}")
         if finish_class in finish_classes:
@@ -83,9 +125,16 @@ def emit_dayz(
         config_classes.add(config_class)
         finish_classes.add(finish_class)
 
+    if namespace_role == "owner":
+        role_label = "standalone owner"
+    elif namespace_role == "satellite":
+        role_label = "satellite content"
+    else:
+        role_label = "independent official PZ content"
+
     lines = [
         "// AUTO-GENERATED by PaintZ PackKit. DO NOT EDIT.",
-        "// Paint Pack API v1 standalone pack config.",
+        f"// Paint Pack API v1 {role_label} pack config.",
         "",
         "class CfgPatches",
         "{",
@@ -103,31 +152,38 @@ def emit_dayz(
         "        requiredVersion = 0.1;",
         "        requiredAddons[] =",
         "        {",
-        '            "PaintZ_DynamicPaint"',
+    ]
+    for index, required_addon in enumerate(required_addons):
+        comma = "," if index < len(required_addons) - 1 else ""
+        lines.append(f'            "{_cpp_string(required_addon)}"{comma}')
+    lines += [
         "        };",
         "    };",
         "};",
         "",
-        "class CfgPaintZPacks",
-        "{",
-        f"    class {owner_class}",
-        "    {",
-        "        apiVersion = 1;",
-        f'        prefix = "{_cpp_string(pack["prefix"])}";',
-        f'        displayName = "{_cpp_string(pack["name"])}";',
     ]
-    if official:
-        lines.append("        official = 1;")
+
+    if namespace_role == "owner":
+        lines += [
+            "class CfgPaintZPacks",
+            "{",
+            f"    class {owner_class}",
+            "    {",
+            "        apiVersion = 1;",
+            f'        prefix = "{_cpp_string(pack["prefix"])}";',
+            f'        displayName = "{_cpp_string(pack["name"])}";',
+            "    };",
+            "};",
+            "",
+        ]
+
     lines += [
-        "    };",
-        "};",
-        "",
         "class CfgPaintZFinishes",
         "{",
     ]
 
     for item in catalog:
-        finish_class = _finish_config_class(owner_class, item)
+        finish_class = _finish_config_class(registration_root, item)
         lines += [
             f"    class {finish_class}",
             "    {",

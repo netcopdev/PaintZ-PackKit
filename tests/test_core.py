@@ -19,16 +19,24 @@ def _copy_template(root: Path) -> None:
     )
 
 
-def _write_manifest(root: Path, paints: list[dict] | None = None, prefix: str = "NCP") -> Path:
+def _write_manifest(
+    root: Path,
+    paints: list[dict] | None = None,
+    prefix: str = "NCP",
+    dayz_overrides: dict | None = None,
+) -> Path:
+    dayz = {
+        "emit_config_fragment": True,
+        "addon_root": "NCP_TestPaints",
+        "class_prefix": "NCP_Test_SprayCan_",
+    }
+    if dayz_overrides:
+        dayz.update(dayz_overrides)
     manifest = {
         "schema_version": 1,
         "pack": {"prefix": prefix, "name": "Netcop Test Paints", "author": "netcopdev"},
         "generator": {"label_size": [256, 256], "surface_size": [256, 256], "pattern_scales": [1.0]},
-        "dayz": {
-            "emit_config_fragment": True,
-            "addon_root": "NCP_TestPaints",
-            "class_prefix": "NCP_Test_SprayCan_",
-        },
+        "dayz": dayz,
         "paints": paints
         or [{"id": "FDE", "name": "Flat Dark Earth", "type": "solid", "color": "#5A4F46"}],
     }
@@ -51,6 +59,7 @@ def test_manifest_and_check(tmp_path: Path):
     path = _write_manifest(tmp_path)
     data = load_manifest(path)
     assert data["pack"]["prefix"] == "NCP"
+    assert data["dayz"]["namespace_role"] == "owner"
     assert data["paints"][0]["color"] == "#5A4F46"
     assert generate(path, check=True) == tmp_path / "generated"
 
@@ -82,6 +91,75 @@ def test_full_solid_generation_emits_api_v1_config(tmp_path: Path):
 
     with Image.open(label) as image:
         assert image.size == (256, 256)
+
+
+def test_satellite_generation_reuses_owner_without_redeclaring_namespace(tmp_path: Path):
+    _copy_template(tmp_path)
+    path = _write_manifest(
+        tmp_path,
+        dayz_overrides={
+            "namespace_role": "satellite",
+            "owner_class": "NCP_NetcopOwnerPack",
+            "owner_patch": "NCP_Owner_Patch",
+            "patch_class": "NCP_Camo_Satellite",
+            "addon_root": "NCP_Camo_Satellite",
+            "class_prefix": "NCP_Camo_SprayCan_",
+        },
+    )
+    out = generate(path, clean=True)
+    text = (out / "dayz" / "config.cpp").read_text(encoding="utf-8")
+
+    assert "class CfgPaintZPacks" not in text
+    assert '"PaintZ_DynamicPaint",' in text
+    assert '"NCP_Owner_Patch"' in text
+    assert 'owner = "NCP_NetcopOwnerPack";' in text
+    assert 'id = "NCP-S-FDE";' in text
+    assert 'paintzFinish = "NCP-S-FDE";' in text
+    assert "class NCP_NETCOPDEV_NETCOP_TEST_PAINTS_S_FDE" in text
+    assert 'texture = "NCP_Camo_Satellite\\data\\surfaces\\ncp_s_fde_co.paa";' in text
+
+
+def test_official_pack_uses_core_owner_without_content_pack_dependency(tmp_path: Path):
+    _copy_template(tmp_path)
+    path = _write_manifest(
+        tmp_path,
+        prefix="PZ",
+        dayz_overrides={
+            "patch_class": "PaintZ_Official_Military_Pack",
+            "addon_root": "PaintZ_Official_Military_Pack",
+            "class_prefix": "PaintZ_Military_SprayCan_",
+        },
+    )
+    out = generate(path, clean=True, official=True)
+    text = (out / "dayz" / "config.cpp").read_text(encoding="utf-8")
+
+    assert "class CfgPaintZPacks" not in text
+    assert "official = 1;" not in text
+    assert 'owner = "PZ_PaintZOfficial";' in text
+    assert 'id = "PZ-S-FDE";' in text
+    assert text.count('"PaintZ_DynamicPaint"') == 1
+    assert "PaintZ_Standard_Pack" not in text
+    assert "class PZ_NETCOPDEV_NETCOP_TEST_PAINTS_S_FDE" in text
+    assert 'texture = "PaintZ_Official_Military_Pack\\data\\surfaces\\pz_s_fde_co.paa";' in text
+
+
+def test_official_pack_may_repeat_canonical_owner_class_explicitly(tmp_path: Path):
+    _copy_template(tmp_path)
+    path = _write_manifest(
+        tmp_path,
+        prefix="PZ",
+        dayz_overrides={
+            "owner_class": "PZ_PaintZOfficial",
+            "patch_class": "PaintZ_Official_Pastel_Pack",
+            "addon_root": "PaintZ_Official_Pastel_Pack",
+        },
+    )
+    out = generate(path, clean=True, official=True)
+    text = (out / "dayz" / "config.cpp").read_text(encoding="utf-8")
+
+    assert "class CfgPaintZPacks" not in text
+    assert 'owner = "PZ_PaintZOfficial";' in text
+    assert '"PaintZ_DynamicPaint"' in text
 
 
 def test_pattern_generation_declares_only_generated_scales(tmp_path: Path):
