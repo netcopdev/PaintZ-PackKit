@@ -119,18 +119,15 @@ def test_satellite_generation_reuses_owner_without_redeclaring_namespace(tmp_pat
     assert 'texture = "NCP_Camo_Satellite\\data\\surfaces\\ncp_s_fde_co.paa";' in text
 
 
-def test_official_satellite_does_not_emit_second_official_owner(tmp_path: Path):
+def test_official_pack_uses_core_owner_without_content_pack_dependency(tmp_path: Path):
     _copy_template(tmp_path)
     path = _write_manifest(
         tmp_path,
         prefix="PZ",
         dayz_overrides={
-            "namespace_role": "satellite",
-            "owner_class": "PZ_PaintZStandardPack",
-            "owner_patch": "PaintZ_Standard_Pack",
-            "patch_class": "PaintZ_Official_Camo_Pack",
-            "addon_root": "PaintZ_Official_Camo_Pack",
-            "class_prefix": "PaintZ_Camo_SprayCan_",
+            "patch_class": "PaintZ_Official_Military_Pack",
+            "addon_root": "PaintZ_Official_Military_Pack",
+            "class_prefix": "PaintZ_Military_SprayCan_",
         },
     )
     out = generate(path, clean=True, official=True)
@@ -138,9 +135,31 @@ def test_official_satellite_does_not_emit_second_official_owner(tmp_path: Path):
 
     assert "class CfgPaintZPacks" not in text
     assert "official = 1;" not in text
-    assert 'owner = "PZ_PaintZStandardPack";' in text
+    assert 'owner = "PZ_PaintZOfficial";' in text
     assert 'id = "PZ-S-FDE";' in text
-    assert '"PaintZ_Standard_Pack"' in text
+    assert text.count('"PaintZ_DynamicPaint"') == 1
+    assert "PaintZ_Standard_Pack" not in text
+    assert "class PZ_NETCOPDEV_NETCOP_TEST_PAINTS_S_FDE" in text
+    assert 'texture = "PaintZ_Official_Military_Pack\\data\\surfaces\\pz_s_fde_co.paa";' in text
+
+
+def test_official_pack_may_repeat_canonical_owner_class_explicitly(tmp_path: Path):
+    _copy_template(tmp_path)
+    path = _write_manifest(
+        tmp_path,
+        prefix="PZ",
+        dayz_overrides={
+            "owner_class": "PZ_PaintZOfficial",
+            "patch_class": "PaintZ_Official_Pastel_Pack",
+            "addon_root": "PaintZ_Official_Pastel_Pack",
+        },
+    )
+    out = generate(path, clean=True, official=True)
+    text = (out / "dayz" / "config.cpp").read_text(encoding="utf-8")
+
+    assert "class CfgPaintZPacks" not in text
+    assert 'owner = "PZ_PaintZOfficial";' in text
+    assert '"PaintZ_DynamicPaint"' in text
 
 
 def test_pattern_generation_declares_only_generated_scales(tmp_path: Path):
