@@ -64,6 +64,24 @@ def test_basic_rejects_appearance_profile(tmp_path: Path):
         load_manifest(path)
 
 
+def test_official_basic_display_name_rejects_basic_prefix(tmp_path: Path):
+    data = _manifest("PZ")
+    data["paints"] = [{"id": "UGY", "name": "Basic Urban Grey", "type": "basic", "color": "#6F7372"}]
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="do not prefix them with 'Basic '"):
+        load_manifest(path, official=True)
+
+
+def test_official_basic_display_name_accepts_color_only(tmp_path: Path):
+    data = _manifest("PZ")
+    data["paints"] = [{"id": "UGY", "name": "Urban Grey", "type": "basic", "color": "#6F7372"}]
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    loaded = load_manifest(path, official=True)
+    assert loaded["paints"][0]["name"] == "Urban Grey"
+
+
 @pytest.mark.parametrize("prefix", ["PZ", "PZA", "PZ9"])
 def test_rejects_reserved_pz_prefix_by_default(tmp_path: Path, prefix: str):
     path = tmp_path / "paints.json"
