@@ -61,6 +61,9 @@ def _finish_config_class(registration_root: str, item: dict) -> str:
 
 
 def _surface_texture_path(surface_root: str, variant: dict) -> str:
+    procedural = variant.get("procedural_texture")
+    if procedural:
+        return procedural
     return surface_root + "\\" + variant["texture_stem"] + "_co.paa"
 
 
@@ -232,8 +235,6 @@ def emit_dayz(
     lines += ["};", ""]
     (out_dir / "config.cpp").write_text("\n".join(lines), encoding="utf-8")
 
-    # Remove outputs from the legacy embedded-generator integration model so
-    # a non-clean rebuild cannot accidentally ship stale per-finish scripts.
     for legacy_name in (
         "PaintZ_Paints.generated.inc",
         "PaintZ_Units.generated.inc",

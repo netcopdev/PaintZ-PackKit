@@ -4,6 +4,7 @@ import re
 import unicodedata
 
 TYPE_CODES = {
+    "basic": "B",
     "solid": "S",
     "camo": "C",
     "pattern": "P",
