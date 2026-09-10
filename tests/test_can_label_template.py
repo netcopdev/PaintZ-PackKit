@@ -1,6 +1,10 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from PIL import Image
+
+from paintz_packkit.svg_label import RED_HEX, _prepare_svg
+
 
 def test_design3_curated_geometry_is_preserved():
     template = Path(__file__).resolve().parents[1] / "assets" / "templates" / "can_design3.svg"
@@ -37,3 +41,23 @@ def test_design3_curated_geometry_is_preserved():
 
     assert (elements["logo"].text or "").strip() == "Paint"
     assert (elements["logo-z"].text or "").strip() == "Z"
+
+
+def test_prepared_svg_preserves_red_z_logo_child():
+    repo_root = Path(__file__).resolve().parents[1]
+    surface = Image.new("RGBA", (1000, 1000), (64, 64, 64, 255))
+    paint = {
+        "name": "Flecktarn",
+        "type": "camo",
+        "pattern": "assets/pattern_sources/ftn.png",
+    }
+
+    svg_string, _ = _prepare_svg(surface, paint, "PZ-C-FTN", repo_root)
+    root = ET.fromstring(svg_string)
+    elements = {element.get("id"): element for element in root.iter() if element.get("id")}
+
+    assert "logo" in elements
+    assert "logo-z" in elements
+    assert (elements["logo"].text or "").strip() == "Paint"
+    assert (elements["logo-z"].text or "").strip() == "Z"
+    assert elements["logo-z"].get("fill") == RED_HEX
