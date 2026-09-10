@@ -252,7 +252,9 @@ generated/
 
 The standard PaintZ label layout is source-controlled as `assets/templates/can_design3.svg`. PackKit controls common PaintZ presentation while manifests supply finish identity/content and restrained pack metadata.
 
-The generated can label includes the PaintZ logo at the top with its distinct red `Z`, followed by the finish code/name and series/badge/footer information. Changes to the shared label geometry or renderer must be treated as PackKit behavior changes and covered by tests/documentation.
+The generated can label includes the PaintZ logo at the top with its distinct red `Z`, followed by the finish code/name and series/badge/footer information. After the label and surface are composited, PackKit applies the standard `CAN_LABEL_ROTATION_DEG = 8.0` cylindrical alignment offset. This is a horizontal wraparound texture shift around the can circumference, not a 2D image rotation, so the texture seam remains continuous.
+
+Changes to the shared label geometry, alignment, or renderer must be treated as PackKit behavior changes and covered by tests/documentation.
 
 Basic cans use `BASIC SERIES` by default. Basic finishes never apply the appearance stack and are not pattern-scaled.
 
@@ -273,7 +275,7 @@ python -m pip install pytest
 pytest -q
 ```
 
-High-value coverage includes normal namespace ownership, third-party satellites, reserved-prefix rejection, core-owned official `PZ` generation, Basic procedural generation/validation, duplicate IDs, generated classname uniqueness, pattern-scale registration, and shared can-label logo/template integrity.
+High-value coverage includes normal namespace ownership, third-party satellites, reserved-prefix rejection, core-owned official `PZ` generation, Basic procedural generation/validation, duplicate IDs, generated classname uniqueness, pattern-scale registration, and shared can-label logo/template/alignment integrity.
 
 See `AGENTS.md`, `docs/MANIFEST_V1.md`, and `docs/INTEROPERABILITY.md` before changing author-facing or runtime-facing output.
 
