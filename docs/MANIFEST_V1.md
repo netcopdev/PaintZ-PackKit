@@ -1,6 +1,6 @@
 # PaintZ PackKit manifest v1
 
-This document describes the author-facing `paints.json` consumed by PaintZ PackKit 0.2.x.
+This document describes the author-facing `paints.json` consumed by PaintZ PackKit 0.3.x.
 
 The manifest schema version is an authoring/build-time format. It is separate from PaintZ Paint Pack API v1, which is the runtime interoperability contract.
 
