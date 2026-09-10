@@ -10,7 +10,7 @@ def test_design3_logo_stays_in_visible_can_label_area():
     root = ET.parse(template).getroot()
     elements = {element.get("id"): element for element in root.iter() if element.get("id")}
 
-    assert elements["logo"].get("y") == "235"
-    assert elements["logo-z"].get("y") == "235"
+    assert elements["logo"].get("y") == "360"
+    assert elements["logo-z"].get("y") == "360"
     assert (elements["logo"].text or "").strip() == "Paint"
     assert (elements["logo-z"].text or "").strip() == "Z"
