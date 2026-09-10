@@ -1,12 +1,12 @@
 # PaintZ PackKit interoperability obligations
 
-The authoritative runtime interoperability specification lives in `netcopdev/PaintZ` at `docs/PAINT_PACK_API.md` and `docs/PAINT_PACK_CONFIG_V1.md`.
+The authoritative runtime interoperability specification lives in `netcopdev/PaintZ` at `docs/PAINT_PACK_API.md`; the concrete DayZ representation is in `docs/PAINT_PACK_CONFIG_V1.md`.
 
-PackKit is a reference authoring/build implementation of that contract. This document records the rules PackKit must enforce or preserve so its generator cannot drift from PaintZ.
+PackKit is a reference authoring/build implementation of that contract. It must conform to PaintZ rather than defining a competing runtime API.
 
 ## Identity model
 
-API v1 uses the complete short PaintZ finish ID as the canonical runtime and persistence identity:
+API v1 uses one complete short finish ID as the canonical runtime and persistence identity:
 
 ```text
 <PREFIX>-<TYPE>-<SUFFIX>
@@ -19,49 +19,86 @@ PZ-B-BLK
 PZ-S-FDE
 PZ-C-FTN
 NCP-B-ODG
+NCP-S-FDE
 NCP-C-FTN
 ```
 
-Do not generate or require a separate reverse-domain canonical finish ID, UUID, secret, ownership token, or online registry identifier.
+Package names, repositories, PBO names, Workshop items, and content categories are not part of finish identity.
 
-## Pack prefix
+Changing a released complete finish ID is a persistence-breaking change. Moving an unchanged finish between packages while retaining its complete ID is packaging-only.
 
-A normal third-party pack chooses exactly one permanent 2-3 character prefix.
+Do not generate or require a second canonical ID, UUID, secret, ownership token, or online registry identifier.
 
-Valid syntax after normalization:
+## Third-party namespace model
+
+A normal third-party pack chooses one permanent 2-3 character prefix matching:
 
 ```text
 ^[A-Z][A-Z0-9]{1,2}$
 ```
 
-All valid prefixes beginning with `PZ` are reserved for official PaintZ content. Ordinary third-party generation must reject `PZ`, `PZA`-`PZZ`, `PZ0`-`PZ9`, and any other valid prefix beginning with `PZ`.
+Normal PackKit generation rejects all valid prefixes beginning with `PZ`.
 
-The official PaintZ Standard Pack is allowed to use `PZ` through the explicit `--official` generation path. This is an interoperability gate, not cryptographic authentication.
+A third-party standalone owner pack:
 
-Changing a released pack prefix is a breaking identity change.
+- emits exactly one `CfgPaintZPacks` owner;
+- registers its finishes against that owner;
+- requires `PaintZ_DynamicPaint`.
 
-## Finish suffix and type
+A third-party family may be split across several PBOs by using `dayz.namespace_role = "satellite"`. A satellite:
+
+- emits no `CfgPaintZPacks` owner;
+- references the family's existing `dayz.owner_class`;
+- requires both `PaintZ_DynamicPaint` and `dayz.owner_patch`;
+- owns its own finish assets, can classes, and finish config children.
+
+This owner/satellite mode is an implementation tool for external multi-PBO namespace families. It is not the user-facing model for official PaintZ collections.
+
+## Official `PZ` namespace
+
+PaintZ runtime itself owns the official `PZ` namespace through the canonical config owner:
+
+```text
+PZ_PaintZOfficial
+```
+
+Official content packs are independent contributors to that namespace. They do not declare `PZ` and they do not depend on another official content pack merely for namespace access.
+
+The `--official` generation path therefore has strict semantics:
+
+- only `PZ` is currently accepted;
+- generated config emits no `CfgPaintZPacks` declaration;
+- every generated `PZ-*` finish uses `owner = "PZ_PaintZOfficial"`;
+- generated `CfgPatches.requiredAddons[]` contains `PaintZ_DynamicPaint` but no Standard/Military/Pastel/Hunting owner dependency;
+- `dayz.namespace_role = "satellite"` is rejected for official content;
+- `dayz.owner_patch` is rejected for official content;
+- an explicit `dayz.owner_class`, if present, must equal `PZ_PaintZOfficial`;
+- unassigned reserved namespaces such as `PZA` or `PZ9` remain rejected until PaintZ explicitly assigns them.
+
+This permits peer official packages such as:
+
+```text
+PaintZ Standard Pack -> PaintZ
+PaintZ Pastel Pack   -> PaintZ
+PaintZ Military Pack -> PaintZ
+PaintZ Hunting Pack  -> PaintZ
+```
+
+All may contain unique `PZ-*` finishes. None is a parent or mandatory base pack for the others.
+
+## Finish types and Basic semantics
 
 PackKit derives each complete finish ID from the pack prefix, the one-character PaintZ type code, and the finish suffix.
 
-Current type letters are:
+Current type letters include:
 
 ```text
 B S C P M R W F X T
 ```
 
-The relevant category semantics are:
+`B` / `basic` means one plain RGB color only. It has no appearance profile, pattern, wear, noise, scratches, grime, rust, or other target-surface treatment. PackKit emits a procedural DayZ color descriptor and does not generate a target-surface PNG/PAA.
 
-- `B` / `basic`: one plain RGB color only. No appearance profile, pattern, wear, noise, scratches, grime, rust or other target-surface treatment. PackKit emits a procedural DayZ color descriptor and does not generate a target-surface PAA.
-- `S` / `solid`: fundamentally one color, but asset-backed and therefore allowed to include deterministic surface character such as grain, scratches, grime, edge wear or rust hints.
-- `C` / `camo`: camouflage artwork.
-- `P` / `pattern`: generic non-camouflage pattern artwork.
-
-Finish suffixes are uppercase alphanumeric, 2-12 characters, with short descriptive 3-character values preferred.
-
-Changing a released complete finish ID is a breaking persistence change.
-
-## Basic finish requirements
+`S` / `solid` remains the asset-backed one-color category and may include deterministic surface character. `C` / `camo` and `P` / `pattern` use pattern artwork.
 
 A Basic manifest entry must contain `color` and must not contain `pattern` or `appearance_profile`.
 
@@ -76,65 +113,61 @@ Example:
 }
 ```
 
-PackKit converts the RGB value to a deterministic procedural runtime surface such as:
+PackKit converts that RGB value to a deterministic procedural runtime surface such as:
 
 ```text
 #(argb,8,8,3)color(0.149020,0.156863,0.152941,1.0,CO)
 ```
 
-The generated config still declares that value as the finish's S100 `texture`, preserving the existing API-v1 `Surfaces` shape. The descriptor is derived representation only; the complete finish ID remains the persisted identity.
+The descriptor is derived representation only; the complete finish ID remains the persisted identity.
 
 Basic finishes still receive normal generated spray-can artwork and thin can classes. Only the painted target surface avoids a PAA.
 
-## What PackKit can and cannot validate
+Complete finish identity includes the type letter, so IDs such as `NCP-B-FDE` and `NCP-S-FDE` may coexist. DayZ config classnames are a separate namespace and must still be unique. PackKit must detect generated can-class collisions; an explicit `dayz_class` may be used where compatibility or deliberate suffix reuse requires it.
+
+## What PackKit validates
 
 PackKit validates locally:
 
-- prefix syntax;
-- reserved `PZ*` use;
+- prefix syntax and reserved `PZ*` rules;
+- third-party owner/satellite requirements;
+- official core-owned `PZ` requirements;
 - type/suffix syntax;
 - Basic/Solid/Pattern field requirements;
-- complete finish-ID construction;
-- uniqueness of finish IDs inside the project/build set;
-- one namespace-owner declaration per generated pack;
+- complete finish-ID construction and local uniqueness;
 - generated class/config/path consistency;
-- generated spray-can classname uniqueness.
+- generated spray-can classname uniqueness;
+- referenced source-file existence and safe paths.
 
 PackKit cannot guarantee that a third-party prefix is globally unused by every independently distributed DayZ mod. It must not pretend a generated UUID or token solves that problem.
 
-Runtime collision detection belongs to PaintZ because only the runtime knows the complete installed mod set.
-
-## Generated ownership structure
-
-A generated single-pack output has exactly one namespace-owner declaration under `CfgPaintZPacks`.
-
-The owner config class is a deterministic config linkage key. It is not persisted and is not another public PaintZ identity. Finish registrations reference that owner key through their `owner` property.
-
-For future multi-PBO pack families, only the owner/core PBO should declare the namespace. Satellite PBOs must depend on that owner and must not re-declare ownership.
-
-## Runtime collision semantics PackKit targets
+## Runtime collision semantics
 
 PaintZ discovers namespace owners before finishes.
 
-- exactly one owner for a prefix -> valid namespace;
-- multiple owner declarations for a prefix -> entire namespace conflicted/disabled;
-- duplicate complete finish ID -> that finish ID is ambiguous/disabled;
+- exactly one owner for a prefix -> namespace valid;
+- multiple owner declarations for a prefix -> entire namespace disabled;
+- duplicate complete finish ID -> that finish ID disabled;
 - no registration silently overwrites another because of load order.
+
+For `PZ`, PaintZ core is the one legitimate owner. Noncanonical or unassigned reserved owner declarations are invalid.
 
 ## Generated pack contents
 
-A normal generated pack contains content/registration rather than PaintZ gameplay logic:
+A generated pack may contain:
 
-- one namespace-owner declaration;
-- finish metadata;
-- procedural S100 surface descriptors for Basic finishes;
-- generated surface textures and explicitly declared pattern-scale variants for asset-backed finishes;
+- finish registrations;
+- runtime surface representations;
+- procedural S100 descriptors for Basic finishes;
+- generated surface textures and explicit scale variants for asset-backed finishes;
 - standardized can textures for all finishes;
-- thin spawnable can subclasses inheriting PaintZ's common base;
-- `CfgPatches` dependency on `PaintZ_DynamicPaint`;
-- optional `types.xml` entries.
+- thin spawnable can subclasses inheriting `PaintZ_SprayCanBase`;
+- DayZ dependency metadata;
+- optional CE type entries.
 
-Normal API-v1 output contains no generated per-finish Enforce action subclasses and no generated runtime paint catalogue. PaintZ resolves finishes generically through its runtime registry.
+A third-party owner also contains one namespace-owner declaration. A third-party satellite and an official `PZ` pack do not.
+
+Generated packs must not contain PaintZ persistence, target policy, synchronization, model inspection, painting actions, per-finish action subclasses, or a private runtime paint catalogue.
 
 ## Surface declaration
 
@@ -152,17 +185,11 @@ For asset-backed finishes:
 - pattern/camouflage finishes declare only scale variants PackKit actually generated;
 - every finish includes a 100% surface.
 
-PackKit currently creates PNG source assets for asset-backed finishes; conversion to PAA/PBO packaging remains a separate build step until PackKit explicitly gains those capabilities.
-
-## Spray-can classname uniqueness
-
-Complete finish identity includes the type letter, so IDs such as `NCP-B-FDE` and `NCP-S-FDE` may coexist.
-
-DayZ config classnames are a separate namespace and must still be unique. PackKit must detect duplicate generated can classnames. An explicit `dayz_class` may be used when a pack needs two finishes with the same suffix or needs to preserve historical classnames.
+PackKit creates PNG source assets for asset-backed finishes; conversion to PAA/PBO packaging remains a separate pack-build step.
 
 ## Standard Pack relationship
 
-`netcopdev/PaintZ-Standard-Pack` is the official reference pack and initially uses prefix `PZ`.
+`netcopdev/PaintZ-Standard-Pack` is an official reference pack contributing to the core-owned `PZ` namespace.
 
 PackKit must build/validate Standard Pack through the same API-v1 machinery plus the explicit `--official` permission. Do not create a separate incompatible format for official content.
 
@@ -170,4 +197,4 @@ The Standard Pack may contain both `PZ-B-*` Basic colors and existing `PZ-S-*` t
 
 ## Source of truth
 
-If this file conflicts with `PaintZ/docs/PAINT_PACK_API.md` or `PaintZ/docs/PAINT_PACK_CONFIG_V1.md`, PaintZ wins. Update PackKit documentation/code/tests to conform rather than creating a second interoperability standard.
+If this file conflicts with `PaintZ/docs/PAINT_PACK_API.md` or `PaintZ/docs/PAINT_PACK_CONFIG_V1.md`, PaintZ wins. Update PackKit code, tests and documentation to conform rather than creating another standard.
