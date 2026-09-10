@@ -172,7 +172,9 @@ def _prepare_svg(surface: Image.Image, paint: dict, code: str, repo_root: Path) 
     }.items():
         _set_text(elements[key], value)
 
-    _set_text(elements["logo"], "Paint")
+    # The red Z is a nested <tspan> inside the logo element. Replacing logo text
+    # with _set_text() would remove that child from the SVG tree before rasterization.
+    elements["logo"].text = "Paint"
     _set_text(elements["logo-z"], "Z")
     elements["logo-z"].set("fill", RED_HEX)
 
