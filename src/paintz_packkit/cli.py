@@ -242,7 +242,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--official",
         action="store_true",
-        help="allow the reserved PZ* namespace and emit official=1; intended for PaintZ official/Standard Pack content",
+        help="generate an independent official PZ content pack linked to the PaintZ-owned PZ namespace",
     )
     parser.add_argument("--version", action="version", version=f"PaintZ PackKit {__version__}")
     return parser
