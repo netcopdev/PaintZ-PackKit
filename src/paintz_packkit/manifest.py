@@ -104,6 +104,12 @@ def load_manifest(path: Path, *, official: bool = False) -> dict:
             raise ValueError(f"Paint {name!r}: type must be one of: {allowed}")
         paint["type"] = typ
 
+        if official and typ == "basic" and name.casefold().startswith("basic "):
+            raise ValueError(
+                f"Paint {name!r}: official Basic finish display names must contain only the color name; "
+                "do not prefix them with 'Basic '"
+            )
+
         if "id" in paint:
             paint["id"] = normalize_suffix(str(paint["id"]))
 
