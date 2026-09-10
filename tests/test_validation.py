@@ -36,6 +36,34 @@ def test_rejects_missing_pattern_file(tmp_path: Path):
         load_manifest(path)
 
 
+def test_basic_requires_color(tmp_path: Path):
+    data = _manifest()
+    data["paints"] = [{"id": "ABC", "name": "Basic", "type": "basic", "pattern": "assets/basic.png"}]
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "basic.png").write_bytes(b"not-an-image")
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="basic finishes require"):
+        load_manifest(path)
+
+
+def test_basic_rejects_appearance_profile(tmp_path: Path):
+    data = _manifest()
+    data["paints"] = [
+        {
+            "id": "ABC",
+            "name": "Basic",
+            "type": "basic",
+            "color": "#112233",
+            "appearance_profile": "clean",
+        }
+    ]
+    path = tmp_path / "paints.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="plain RGB only"):
+        load_manifest(path)
+
+
 @pytest.mark.parametrize("prefix", ["PZ", "PZA", "PZ9"])
 def test_rejects_reserved_pz_prefix_by_default(tmp_path: Path, prefix: str):
     path = tmp_path / "paints.json"

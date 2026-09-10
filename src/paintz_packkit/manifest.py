@@ -113,6 +113,14 @@ def load_manifest(path: Path, *, official: bool = False) -> dict:
             raise ValueError(f"Paint {name!r}: specify either 'color' or 'pattern', not both")
         if not has_color and not has_pattern:
             raise ValueError(f"Paint {name!r}: needs either 'color' or 'pattern' artwork data")
+
+        if typ == "basic" and not has_color:
+            raise ValueError(f"Paint {name!r}: basic finishes require a 'color' and cannot use pattern artwork")
+        if typ == "solid" and not has_color:
+            raise ValueError(f"Paint {name!r}: solid finishes require a single base 'color'")
+        if typ in {"camo", "pattern"} and not has_pattern:
+            raise ValueError(f"Paint {name!r}: {typ} finishes require 'pattern' artwork")
+
         if has_color:
             paint["color"] = normalize_hex(str(paint["color"]))
         if has_pattern:
@@ -127,6 +135,8 @@ def load_manifest(path: Path, *, official: bool = False) -> dict:
             paint["appearance_profile"] = str(paint["appearance_profile"]).strip()
             if not paint["appearance_profile"]:
                 raise ValueError(f"Paint {name!r}: appearance_profile cannot be empty")
+            if typ == "basic":
+                raise ValueError(f"Paint {name!r}: basic finishes are plain RGB only and cannot use appearance_profile")
 
         if "dayz_class" in paint:
             paint["dayz_class"] = _require_config_class(paint["dayz_class"], f"Paint {name!r}: dayz_class")

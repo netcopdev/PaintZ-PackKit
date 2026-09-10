@@ -51,10 +51,12 @@ API v1 uses one short complete finish ID as both runtime identity and persisted 
 Examples:
 
 ```text
-PZ-C-FTN
+PZ-B-BLK
 PZ-S-FDE
-NCP-C-FTN
+PZ-C-FTN
+NCP-B-ODG
 NCP-S-FDE
+NCP-C-FTN
 ```
 
 Package/repository/PBO names are not part of finish identity. Moving an unchanged finish between packages is not an identity change when the complete finish ID is retained.
@@ -116,6 +118,26 @@ Do not create dependencies such as Military -> Standard or Pastel -> Standard me
 
 Do not encode content categories by consuming `PZA`, `PZM`, `PZH`, etc. The package/collection name and the canonical finish namespace are separate concerns.
 
+## Finish type and suffix
+
+Keep the type mapping synchronized with the authoritative PaintZ API and runtime. Do not add or remove a type letter in PackKit alone.
+
+Current type letters include:
+
+```text
+B S C P M R W F X T
+```
+
+`B` / `basic` is a predefined plain RGB-only finish. It has no pattern or appearance profile. PackKit emits a procedural DayZ color descriptor as its S100 runtime surface and does not generate a target-surface PNG/PAA for it. It still receives normal can artwork and a thin spray-can class.
+
+`S` / `solid` remains the asset-backed one-color category and may include deterministic surface treatment/detail such as grain, scratches, grime, edge wear or rust hints. Do not collapse Basic and Solid into one category.
+
+Complete finish identity includes type, so IDs such as `NCP-B-FDE` and `NCP-S-FDE` may coexist. DayZ config classnames are a separate namespace and must still be unique. Detect generated can-class collisions and allow explicit `dayz_class` where compatibility or deliberate suffix reuse requires it.
+
+Finish suffixes are uppercase alphanumeric, 2-12 characters, with descriptive 3-character suffixes preferred. Changing a released complete finish ID is a breaking persistence change.
+
+IDs and generated classnames must be deterministic from authoritative input. Never derive identity from timestamps, random values or unordered traversal.
+
 ## Runtime collision semantics PackKit must target
 
 PaintZ validates the complete loaded set:
@@ -125,7 +147,7 @@ PaintZ validates the complete loaded set:
 - duplicate complete finish ID -> that finish disabled;
 - no first-loaded-wins or last-loaded-wins overwrite behavior.
 
-For `PZ`, the legitimate owner is PaintZ core. Any content pack redeclaring `PZ` creates a real collision and is invalid.
+For `PZ`, the legitimate owner is PaintZ core. Reserved owner declarations that are not explicitly assigned by PaintZ are invalid.
 
 PackKit validates local syntax and local duplicates. It cannot guarantee that an arbitrary third-party prefix is globally unused. Do not imply it can prove prefix ownership.
 
@@ -148,6 +170,8 @@ Third-party satellite output generates the same finish/can/surface content excep
 
 Official `PZ` output generates the same finish/can/surface content except that it emits no owner, links every finish to `PZ_PaintZOfficial`, and has no content-pack owner dependency.
 
+For `B` / `basic`, output must emit one procedural-color S100 representation and no target-surface asset. Can artwork remains normal generated content.
+
 Normal API-v1 output must **not** generate:
 
 - per-finish `ActionPaintZPaint_*` Enforce classes;
@@ -157,14 +181,6 @@ Normal API-v1 output must **not** generate:
 
 Generated owner/config classnames are config linkage/local keys, not another PaintZ identity or security token. Use distinctive deterministic names because DayZ merges config trees before PaintZ enumerates them.
 
-## Finish type and suffix
-
-Keep the type mapping synchronized with the authoritative PaintZ API and runtime. Do not add or remove a type letter in PackKit alone.
-
-Finish suffixes are uppercase alphanumeric, 2-12 characters, with descriptive 3-character suffixes preferred. Changing a released complete finish ID is a breaking persistence change.
-
-IDs and generated classnames must be deterministic from authoritative input. Never derive identity from timestamps, random values or unordered traversal.
-
 ## Spray-can design and branding
 
 PaintZ core owns the common can model/UV/runtime behaviour and standard PaintZ label identity. PackKit generates finish-specific can artwork and thin config subclasses.
@@ -172,6 +188,8 @@ PaintZ core owns the common can model/UV/runtime behaviour and standard PaintZ l
 Standard templates retain PaintZ-controlled layout, logo/identity, geometry, typography rules, badge placement, margins and footer treatment.
 
 Pack-controlled fields may include finish name/ID/type, publisher name, small publisher mark, and restrained collection/series text. Do not expose arbitrary coordinates, unrestricted fonts, free-form geometry or replacement of the common can model as normal manifest fields.
+
+Basic cans should identify themselves as Basic rather than Solid in generated series text.
 
 ## Generator/source-of-truth discipline
 
@@ -192,6 +210,7 @@ Validate as applicable:
 - third-party owner/satellite requirements;
 - official core-owned `PZ` requirements;
 - finish suffix/type syntax;
+- Basic requirements (`color` required, no `pattern`, no `appearance_profile`);
 - complete finish-ID uniqueness;
 - generated classname uniqueness;
 - referenced source-file existence;
@@ -215,6 +234,9 @@ Generated output must remain under the selected build/output root. Never delete 
 High-value automated coverage includes:
 
 - namespaced IDs and normalization;
+- Basic `B` ID generation;
+- Basic procedural S100 emission and absence of a target-surface file;
+- Basic rejection of pattern/appearance-profile input;
 - reserved `PZ*` rejection in normal mode;
 - independent official `PZ` generation with `PZ_PaintZOfficial`;
 - rejection of official satellite/content-pack dependencies;
@@ -224,7 +246,7 @@ High-value automated coverage includes:
 - deterministic class generation;
 - owner, satellite and official config structure;
 - absence of legacy generated Enforce actions/catalogue;
-- representative solid and patterned finishes;
+- representative Solid and patterned finishes;
 - explicit scale declarations;
 - safe/missing source paths;
 - Windows/path edge cases.
@@ -239,6 +261,8 @@ Examples should be valid PackKit inputs whenever practical.
 
 ## Avoid premature complexity
 
-Do not invent a GUI, online prefix registry, cryptographic ownership system, broad plugin framework, unrestricted theming system, or category-specific official namespaces without a concrete requirement.
+Do not invent a GUI, online prefix registry, cryptographic ownership system, broad plugin framework, unrestricted theming system, anonymous/runtime-generated color-persistence system, or category-specific official namespaces without a concrete requirement.
 
-Prefer the smallest design that supports deterministic identity, explicit ownership, independent official content packs, third-party multi-PBO families, explicit finish registration, validation, and reproducible generation.
+Basic procedural RGB support is infrastructure for predefined pack-owned finishes. Do not reinterpret it as authorization to add arbitrary user-generated colors, paint mixing, cumulative tint state, or RGB persistence without a separate explicit design decision.
+
+Prefer the smallest design that supports deterministic identity, explicit ownership, independent official content packs, third-party multi-PBO families, explicit finish registration, Basic procedural surfaces, validation, and reproducible generation.

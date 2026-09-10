@@ -53,6 +53,10 @@ def test_ids_are_api_v1_namespaced():
         "NCP-S-FDE",
         False,
     )
+    assert code_for_paint({"id": "BLK", "name": "Basic Black", "type": "basic"}, "NCP") == (
+        "NCP-B-BLK",
+        False,
+    )
 
 
 def test_manifest_and_check(tmp_path: Path):
@@ -91,6 +95,26 @@ def test_full_solid_generation_emits_api_v1_config(tmp_path: Path):
 
     with Image.open(label) as image:
         assert image.size == (256, 256)
+
+
+def test_basic_generation_uses_procedural_texture_and_no_surface_asset(tmp_path: Path):
+    _copy_template(tmp_path)
+    path = _write_manifest(
+        tmp_path,
+        paints=[{"id": "BLK", "name": "Basic Black", "type": "basic", "color": "#262827"}],
+    )
+    out = generate(path, clean=True)
+
+    label = out / "labels" / "ncp_b_blk_co.png"
+    surface = out / "surfaces" / "ncp_b_blk_co.png"
+    config = (out / "dayz" / "config.cpp").read_text(encoding="utf-8")
+
+    assert label.exists()
+    assert not surface.exists()
+    assert 'id = "NCP-B-BLK";' in config
+    assert 'type = "basic";' in config
+    assert '#(argb,8,8,3)color(0.149020,0.156863,0.152941,1.0,CO)' in config
+    assert "NCP_TestPaints\\data\\surfaces\\ncp_b_blk_co.paa" not in config
 
 
 def test_satellite_generation_reuses_owner_without_redeclaring_namespace(tmp_path: Path):

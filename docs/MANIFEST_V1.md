@@ -22,10 +22,10 @@ The manifest schema version is an authoring/build-time format. It is separate fr
   },
   "paints": [
     {
-      "id": "FDE",
-      "name": "Flat Dark Earth",
-      "type": "solid",
-      "color": "#5A4F46"
+      "id": "BLK",
+      "name": "Basic Black",
+      "type": "basic",
+      "color": "#262827"
     }
   ]
 }
@@ -75,13 +75,15 @@ Optional `[width, height]` for generated can textures. Default is `1024 x 1024`.
 
 ### `generator.surface_size`
 
-Optional `[width, height]` for runtime finish surfaces. Default is `1024 x 1024`.
+Optional `[width, height]` for generated asset-backed runtime finish surfaces. Default is `1024 x 1024`.
+
+Basic finishes do not generate a target-surface image, so this setting does not affect their runtime surface representation.
 
 ### `generator.pattern_scales`
 
 Optional non-empty array of positive scales. Each value must resolve to a whole percentage from 1 through 1000, and `1.0` is mandatory.
 
-Pattern-backed finishes receive these generated variants. Solid finishes always generate only their 100% surface.
+Pattern-backed finishes receive these generated variants. Asset-backed non-pattern finishes generate only their 100% surface. Basic finishes are procedural and always expose only S100 without generating a surface image.
 
 Example:
 
@@ -95,7 +97,7 @@ becomes scale percentages:
 50 75 100 150 200 300
 ```
 
-PaintZ receives explicit `Surfaces` entries only for variants that PackKit generated.
+PaintZ receives explicit `Surfaces` entries only for variants that PackKit generated or, for Basic, the single procedural S100 representation.
 
 Other existing rendering settings retained from the extracted generator remain accepted under `generator`.
 
@@ -105,7 +107,7 @@ Optional object controlling generated DayZ config names/paths. In normal use onl
 
 ### `dayz.addon_root`
 
-Optional DayZ/PBO source root used in generated `.paa` references.
+Optional DayZ/PBO source root used in generated `.paa` references for can artwork and asset-backed target surfaces.
 
 Example:
 
@@ -113,12 +115,14 @@ Example:
 "addon_root": "NCP_ExamplePaintPack"
 ```
 
-produces paths such as:
+may produce paths such as:
 
 ```text
 NCP_ExamplePaintPack\data\cans\ncp_s_fde_co.paa
 NCP_ExamplePaintPack\data\surfaces\ncp_s_fde_co.paa
 ```
+
+Basic target surfaces do not use an addon path; their generated `texture` value is a procedural DayZ color descriptor.
 
 If omitted, PackKit derives a deterministic root from the generated owner config class.
 
@@ -156,7 +160,7 @@ Optional lifetime for generated `types.generated.xml`. Default `14400`.
 
 ### `dayz.emit_config_fragment`
 
-Legacy field name retained from the extracted generator. When `false`, DayZ config/type output is skipped. When true/omitted, PackKit 0.2 emits a complete API-v1 `generated/dayz/config.cpp`, not the old per-finish action fragments.
+Legacy field name retained from the extracted generator. When `false`, DayZ config/type output is skipped. When true/omitted, PackKit emits a complete API-v1 `generated/dayz/config.cpp`, not old per-finish action fragments.
 
 ## `paints`
 
@@ -174,16 +178,16 @@ Allowed after normalization:
 
 A descriptive three-character suffix is preferred.
 
-Example with `pack.prefix = NCP` and `type = solid`:
+Example with `pack.prefix = NCP` and `type = basic`:
 
 ```json
-"id": "FDE"
+"id": "BLK"
 ```
 
 produces:
 
 ```text
-NCP-S-FDE
+NCP-B-BLK
 ```
 
 Omitting `id` permits PackKit to suggest one, but release manifests should commit explicit suffixes so identity cannot change because a suggestion algorithm changes.
@@ -196,31 +200,40 @@ Required human-readable finish name.
 
 Required finish category. Current manifest spellings and PaintZ type letters are:
 
-| Manifest type | ID letter |
-|---|---|
-| `solid` | `S` |
-| `camo` | `C` |
-| `pattern` | `P` |
-| `metallic` | `M` |
-| `rusted` | `R` |
-| `weathered` | `W` |
-| `fluorescent` | `F` |
-| `special` / `custom` | `X` |
-| `transparent` | `T` |
+| Manifest type | ID letter | Meaning |
+|---|---|---|
+| `basic` | `B` | plain RGB only, procedural target surface, no appearance treatment |
+| `solid` | `S` | one-color asset-backed finish; may include wear/noise/detail |
+| `camo` | `C` | camouflage artwork |
+| `pattern` | `P` | generic non-camouflage pattern |
+| `metallic` | `M` | metallic |
+| `rusted` | `R` | rusted/oxidized |
+| `weathered` | `W` | weathered |
+| `fluorescent` | `F` | fluorescent |
+| `special` / `custom` | `X` | special/custom |
+| `transparent` | `T` | transparent/tint |
+
+Basic and Solid are intentionally distinct even when they share the same nominal/base color.
 
 ### `color`
 
-For a solid/color-backed finish, specify exactly one `#RRGGBB` color and omit `pattern`.
+For `basic` and `solid`, specify exactly one `#RRGGBB` color and omit `pattern`.
+
+For `basic`, the color is converted directly to a procedural DayZ surface descriptor. No target-surface PNG/PAA is generated.
+
+For `solid`, the color is the base of the generated target-surface image and may be modified visually by the selected appearance profile.
 
 ### `pattern`
 
-For a pattern-backed finish, specify a safe relative source path and omit `color`.
+For a `camo` or `pattern` finish, specify a safe relative source path and omit `color`.
 
 Absolute paths and parent traversal (`..`) are rejected. The source file must exist when the manifest is validated/generated.
 
 ### `appearance_profile`
 
-Optional named appearance profile. It must resolve through the workspace or PackKit appearance-profile configuration during rendering.
+Optional named appearance profile for asset-backed finishes. It must resolve through the workspace or PackKit appearance-profile configuration during rendering.
+
+`basic` explicitly forbids `appearance_profile`; Basic means color only.
 
 ### `dayz_class`
 
@@ -228,16 +241,18 @@ Optional explicit spawnable can classname for this finish. Normally PackKit deri
 
 Use only valid DayZ config classname characters.
 
+Complete finish IDs include the type letter, so the same suffix may legally appear in different types, for example `NCP-B-FDE` and `NCP-S-FDE`. DayZ config classnames still have to be unique. If default classname derivation would collide, use distinct explicit `dayz_class` values where appropriate; PackKit rejects duplicate generated classnames.
+
 ### Label text overrides
 
-The extracted renderer currently retains optional fields such as:
+The renderer retains optional fields such as:
 
 - `finish`;
 - `badge_text`;
 - `field_text`;
 - `footer_text`.
 
-They affect standard label text only. They do not alter PaintZ runtime identity or mechanics.
+They affect standard label text only. They do not alter PaintZ runtime identity or mechanics. Basic can labels use `BASIC SERIES` by default.
 
 ## Generated identity and files
 
@@ -245,17 +260,23 @@ Given:
 
 ```text
 prefix = NCP
-type = camo
-id = FTN
+type = basic
+id = BLK
 ```
 
 PackKit generates canonical finish ID:
 
 ```text
-NCP-C-FTN
+NCP-B-BLK
 ```
 
-and file stems such as:
+It generates the can artwork/preview/catalog entries, but no `generated/surfaces/ncp_b_blk_co.png`. Generated config instead includes a procedural S100 value similar to:
+
+```text
+#(argb,8,8,3)color(0.149020,0.156863,0.152941,1.0,CO)
+```
+
+For asset-backed finishes, generated surface file stems continue to use names such as:
 
 ```text
 ncp_c_ftn_co.png
@@ -263,7 +284,7 @@ ncp_c_ftn_s050_co.png
 ncp_c_ftn_s150_co.png
 ```
 
-The generated `config.cpp` references corresponding `.paa` names after the normal DayZ texture-conversion/build step.
+and generated `config.cpp` references corresponding `.paa` names after the normal DayZ texture-conversion/build step.
 
 ## Official mode
 

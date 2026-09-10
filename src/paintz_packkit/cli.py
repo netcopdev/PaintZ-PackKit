@@ -28,6 +28,16 @@ def average_rgb(image: Image.Image) -> tuple[int, int, int]:
     return image.convert("RGB").resize((1, 1), Image.Resampling.BOX).getpixel((0, 0))
 
 
+def procedural_color_texture(color: str) -> str:
+    value = color.lstrip("#")
+    rgb = tuple(int(value[i : i + 2], 16) for i in (0, 2, 4))
+    normalized = tuple(component / 255.0 for component in rgb)
+    return (
+        "#(argb,8,8,3)color("
+        f"{normalized[0]:.6f},{normalized[1]:.6f},{normalized[2]:.6f},1.0,CO)"
+    )
+
+
 def load_appearance_profiles(repo_root: Path) -> dict:
     candidates = [
         repo_root / "config" / "appearance_profiles.json",
@@ -98,16 +108,27 @@ def _build_catalog(data: dict) -> tuple[list[dict], int]:
         codes[code] = {"name": paint["name"], "type": paint["type"]}
         suggested_count += int(suggested)
         slug = code_to_slug(code)
+        is_basic = paint["type"] == "basic"
         is_pattern = bool(paint.get("pattern"))
         variants = []
-        for scale, scale_percent in (pattern_scales if is_pattern else [(1.0, 100)]):
+        if is_basic:
             variants.append(
                 {
-                    "scale": scale,
-                    "scale_percent": scale_percent,
-                    "texture_stem": surface_variant_stem(slug, scale_percent),
+                    "scale": 1.0,
+                    "scale_percent": 100,
+                    "texture_stem": slug,
+                    "procedural_texture": procedural_color_texture(paint["color"]),
                 }
             )
+        else:
+            for scale, scale_percent in (pattern_scales if is_pattern else [(1.0, 100)]):
+                variants.append(
+                    {
+                        "scale": scale,
+                        "scale_percent": scale_percent,
+                        "texture_stem": surface_variant_stem(slug, scale_percent),
+                    }
+                )
         catalog.append(
             {
                 "name": paint["name"],
@@ -120,6 +141,7 @@ def _build_catalog(data: dict) -> tuple[list[dict], int]:
                 "source": paint.get("color") or paint.get("pattern"),
                 "appearance_profile": paint.get("appearance_profile"),
                 "dayz_class": paint.get("dayz_class"),
+                "is_basic": is_basic,
                 "is_pattern": is_pattern,
                 "surface_variants": variants,
             }
@@ -163,23 +185,26 @@ def generate(manifest_path: Path, clean: bool = False, check: bool = False, *, o
         label = render_label(base, paint, item["code"], repo_root, appearance_cfg)
         save_png(label, out / "labels" / f"{item['texture_stem']}_co.png")
 
-        for variant in item["surface_variants"]:
-            surface = render_surface_scaled(
-                paint,
-                item["code"],
-                repo_root,
-                surface_size,
-                appearance_cfg,
-                pattern_scale=variant["scale"],
-            )
-            if paint.get("color") and variant["scale_percent"] == 100:
-                avg = average_rgb(surface)
-                print(
-                    f"{item['code']}: configured={str(paint['color']).upper()} "
-                    f"avg_rgb=({avg[0]},{avg[1]},{avg[2]}) "
-                    f"icc={'yes' if surface.info.get('icc_profile') else 'no'}"
+        if not item["is_basic"]:
+            for variant in item["surface_variants"]:
+                surface = render_surface_scaled(
+                    paint,
+                    item["code"],
+                    repo_root,
+                    surface_size,
+                    appearance_cfg,
+                    pattern_scale=variant["scale"],
                 )
-            save_png(surface, out / "surfaces" / f"{variant['texture_stem']}_co.png")
+                if paint.get("color") and variant["scale_percent"] == 100:
+                    avg = average_rgb(surface)
+                    print(
+                        f"{item['code']}: configured={str(paint['color']).upper()} "
+                        f"avg_rgb=({avg[0]},{avg[1]},{avg[2]}) "
+                        f"icc={'yes' if surface.info.get('icc_profile') else 'no'}"
+                    )
+                save_png(surface, out / "surfaces" / f"{variant['texture_stem']}_co.png")
+        else:
+            print(f"{item['code']}: procedural_rgb={str(paint['color']).upper()} surface_asset=none")
 
         preview_path = out / "previews" / f"{item['texture_stem']}_preview.png"
         save_preview(label, preview_path)
