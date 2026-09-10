@@ -5,6 +5,7 @@
 - added `B` / `basic` procedural RGB finishes: Basic cans keep normal generated artwork/classes while painted targets use a generated procedural S100 color descriptor and require no target-surface PNG/PAA;
 - kept Basic and Solid as distinct finish semantics and IDs;
 - restored the Design 3 PaintZ top logo to its proven can-label position and added a regression test for logo presence/placement;
+- fixed label SVG preparation so updating the white `Paint` text no longer removes the nested red `Z` before rasterization; added a prepared-SVG regression test that verifies the red `logo-z` survives generation;
 - synchronized manifest/interoperability documentation with the core-owned `PZ_PaintZOfficial` official-generation model.
 
 ## 0.3.0 - namespace contributors and satellite packs
