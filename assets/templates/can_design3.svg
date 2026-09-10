@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1000 1000">
   <g id="label-art" text-anchor="middle">
-    <text id="logo" x="400" y="205" text-anchor="start" font-family="Arial" font-size="145" font-weight="900" letter-spacing="-5" fill="#EFEEDC" stroke="#1D1F1B" stroke-width="3" paint-order="stroke">Paint</text>
-    <text id="logo-z" x="600" y="205" text-anchor="start" font-family="Arial" font-size="145" font-weight="900" fill="#992D26" stroke="#1D1F1B" stroke-width="3" paint-order="stroke">Z</text>
+    <text id="logo" x="400" y="235" text-anchor="start" font-family="Arial" font-size="145" font-weight="900" letter-spacing="-5" fill="#EFEEDC" stroke="#1D1F1B" stroke-width="3" paint-order="stroke">Paint</text>
+    <text id="logo-z" x="600" y="235" text-anchor="start" font-family="Arial" font-size="145" font-weight="900" fill="#992D26" stroke="#1D1F1B" stroke-width="3" paint-order="stroke">Z</text>
     <text id="paint-code" x="500" y="505" font-family="Arial" font-size="45" font-weight="900" letter-spacing="2" fill="#EFEEDC" stroke="#1D1F1B" stroke-width="2" paint-order="stroke">PZ-S-ID</text>
     <text id="paint-name" x="500" y="565" font-family="Arial" font-size="55" font-weight="900" fill="#EFEEDC" stroke="#1D1F1B" stroke-width="2.5" paint-order="stroke">PAINT NAME</text>
     <line id="divider" x1="380" y1="625" x2="620" y2="625" stroke="#EFEEDC" stroke-width="5" />
