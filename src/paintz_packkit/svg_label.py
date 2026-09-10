@@ -5,12 +5,13 @@ from pathlib import Path
 import os
 import xml.etree.ElementTree as ET
 
-from PIL import Image, ImageFont
+from PIL import Image, ImageChops, ImageFont
 
 from .finish import DEFAULT_APPEARANCE, render_surface
 
 FRONT_WIDTH = 0.40
 VIEWBOX_SIZE = 1000.0
+CAN_LABEL_ROTATION_DEG = 8.0
 DARK_HEX = "#1D1F1B"
 LIGHT_HEX = "#EFEEDC"
 CREAM_HEX = "#E0DABF"
@@ -172,7 +173,9 @@ def _prepare_svg(surface: Image.Image, paint: dict, code: str, repo_root: Path) 
     }.items():
         _set_text(elements[key], value)
 
-    _set_text(elements["logo"], "Paint")
+    # The red Z is a nested <tspan> inside the logo element. Replacing logo text
+    # with _set_text() would remove that child from the SVG tree before rasterization.
+    elements["logo"].text = "Paint"
     _set_text(elements["logo-z"], "Z")
     elements["logo-z"].set("fill", RED_HEX)
 
@@ -261,6 +264,13 @@ def _rasterize_svg(svg_string: str, font_files: list[str], width: int, height: i
         return image.convert("RGBA")
 
 
+def _rotate_label_around_can(image: Image.Image, degrees: float = CAN_LABEL_ROTATION_DEG) -> Image.Image:
+    shift_px = round(image.width * float(degrees) / 360.0)
+    if shift_px == 0:
+        return image
+    return ImageChops.offset(image, shift_px, 0)
+
+
 def render_label(
     base: Image.Image,
     paint: dict,
@@ -279,4 +289,4 @@ def render_label(
     svg_string, fonts = _prepare_svg(surface, paint, code, repo_root)
     overlay = _rasterize_svg(svg_string, fonts, surface.width, surface.height)
     surface.alpha_composite(overlay)
-    return surface
+    return _rotate_label_around_can(surface)
